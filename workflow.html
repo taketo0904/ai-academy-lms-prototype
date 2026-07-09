@@ -114,9 +114,9 @@
 <header>
   <div class="kicker">Workflow Design · 設計書</div>
   <h1>AI動画コンテンツ 製造ワークフロー</h1>
-  <p class="lede">Web上のAI情報を調査し、企画→台本→素材生成→紐付け→動画生成→編集→説明文までを<b>8体のエージェント</b>で連結する、月20本規模の量産パイプライン。さらに最上位に、この8体を自動で構築・保守する<b>ビルダーエージェント（メタ層）</b>を置く。使用APIと概算コストを含む設計仕様。</p>
+  <p class="lede">Web上のAI情報を調査し、企画→台本→素材生成→紐付け→動画生成→編集→レビュー→説明文までを<b>9体のエージェント</b>で連結する、月20本規模の量産パイプライン。さらに最上位に、この9体を自動で構築・保守する<b>ビルダーエージェント（メタ層）</b>を置く。使用APIと概算コストを含む設計仕様。</p>
   <div class="meta">
-    <span class="chip">エージェント: <b>8体 ＋ ビルダー</b></span>
+    <span class="chip">エージェント: <b>9体 ＋ ビルダー</b></span>
     <span class="chip">前提: <b>月20本以上</b></span>
     <span class="chip">動画: <b>Higgsfield AI（公式API）</b></span>
     <span class="chip">調査: <b>Tavily</b></span>
@@ -126,7 +126,7 @@
 </header>
 
 <h2><span class="no">01</span> 全体像</h2>
-<p class="sub">最上位のビルダーが下の8体を構築・保守し、実行層の8エージェントが直列で1本を作る。動画生成には、生成素材に加えて<b>こちらから任意の素材・画像を渡せる</b>。人が挟まるのは「企画GO」と「最終レビュー」の2点。</p>
+<p class="sub">最上位のビルダーが下の9体を構築・保守し、実行層の9エージェントが直列で1本を作る。動画生成には、生成素材に加えて<b>こちらから任意の素材・画像を渡せる</b>。人が挟まるのは「企画GO」と「最終レビュー」の2点。</p>
 
 <div class="builder">
   <div class="bh"><span class="ic">⚙️</span> メタ層 ── ビルダーエージェント（この8体を作る／動かせるようにするエージェント）</div>
@@ -142,7 +142,8 @@
   <div class="step newa"><div class="node">5</div><div class="scard"><div class="sct"><span class="ic">🔗</span> 素材×台本 紐付け <span class="badge nw">新規</span></div><div class="scd">生成素材とこちら提供素材を、台本のシーンに割り当て、動画生成用のショットリストを組む。</div><div class="scio"><b>入力</b> 台本＋素材 <b>出力</b> ショットリスト（シーン↔素材↔尺）</div></div></div>
   <div class="step gen"><div class="node">6</div><div class="scard"><div class="sct"><span class="ic">🎬</span> 動画生成 <span class="badge hu">こちら提供の素材/画像も入力</span></div><div class="scd">ショットリストをHiggsfieldプロンプトに変換し、クリップを生成。任意でこちらの素材・画像をimage-to-videoの入力に使う。</div><div class="scio"><b>入力</b> ショットリスト＋（任意）手動素材 <b>出力</b> 動画クリップ群</div></div></div>
   <div class="step newa"><div class="node">7</div><div class="scard"><div class="sct"><span class="ic">✂️</span> 動画編集 <span class="badge nw">新規</span></div><div class="scd">クリップを台本順に結合し、テロップ・BGM・トランジション・尺調整を適用して1本に仕上げる。</div><div class="scio"><b>入力</b> クリップ群＋台本 <b>出力</b> 完成動画</div></div></div>
-  <div class="step"><div class="node">8</div><div class="scard"><div class="sct"><span class="ic">🗒️</span> 説明文生成 <span class="badge hu">人: 最終レビュー</span></div><div class="scd">完成動画と企画書から、タイトル・説明文・SNS投稿文・字幕を生成。</div><div class="scio"><b>入力</b> 完成動画＋企画書 <b>出力</b> 説明文一式</div></div></div>
+  <div class="step newa"><div class="node">8</div><div class="scard"><div class="sct"><span class="ic">🔎</span> 動画レビュー <span class="badge nw">新規</span> <span class="badge hu">NG→⑥⑦へ差し戻し</span></div><div class="scd">完成動画を台本・企画と照合し、品質・尺・テロップ誤字・トンマナ・不適切表現をチェック。合否を判定。</div><div class="scio"><b>入力</b> 完成動画＋台本＋企画 <b>出力</b> レビュー結果（GO / 差し戻し＋指摘）</div></div></div>
+  <div class="step"><div class="node">9</div><div class="scard"><div class="sct"><span class="ic">🗒️</span> 説明文生成 <span class="badge hu">人: 最終レビュー</span></div><div class="scd">レビューGO後、完成動画と企画書からタイトル・説明文・SNS投稿文・字幕を生成。</div><div class="scio"><b>入力</b> 完成動画＋企画書 <b>出力</b> 説明文一式</div></div></div>
 </div>
 
 <div class="box info">
@@ -151,7 +152,7 @@
 </div>
 
 <h2><span class="no">02</span> 各エージェント仕様</h2>
-<p class="sub">役割・入出力・使用API/モデル。モデルは難易度で出し分ける（企画/台本=高性能、紐付け/整形=低コスト）。最上位に<span style="color:var(--ink);font-weight:700">ビルダー（メタ層）</span>、その下に実行層の8体。</p>
+<p class="sub">役割・入出力・使用API/モデル。モデルは難易度で出し分ける（企画/台本=高性能、紐付け/整形=低コスト）。最上位に<span style="color:var(--ink);font-weight:700">ビルダー（メタ層）</span>、その下に実行層の9体。</p>
 
 <div class="agent meta">
   <div class="ah"><div class="ab">⚙️</div><div><div class="an">Agent ⚙ ── ビルダー（構築エージェント）<span class="badge nw" style="background:#e5e8ee;color:var(--ink)">メタ層</span></div><div class="ar">Pipeline Builder / Orchestrator-Constructor</div></div></div>
@@ -240,10 +241,21 @@
   </dl>
 </div>
 
-<div class="agent">
-  <div class="ah"><div class="ab">🗒️</div><div><div class="an">Agent 8 ── 説明文生成</div><div class="ar">Copy / Description</div></div></div>
+<div class="agent nw">
+  <div class="ah"><div class="ab">🔎</div><div><div class="an">Agent 8 ── 動画レビュー <span class="badge nw">新規</span></div><div class="ar">Video QA / Review Gate</div></div></div>
   <dl>
-    <dt>役割</dt><dd>完成動画と企画書から、タイトル・説明文・SNS投稿文・字幕/概要を生成。</dd>
+    <dt>役割</dt><dd>完成動画を台本・企画と照合し、品質・尺・テロップ誤字・映像の破綻・トンマナ・不適切表現をチェック。合否を判定し、NGは差し戻し先（⑥生成 or ⑦編集）と指摘を返す。</dd>
+    <dt>入力</dt><dd>完成動画（キーフレーム）＋台本＋企画書</dd>
+    <dt>出力</dt><dd>レビュー結果（GO / 差し戻し・指摘リスト・差し戻し先）</dd>
+    <dt>API</dt><dd>Claude <code>claude-opus-4-8</code>（ビジョンで映像を判定）＋ <code>ffmpeg</code> でキーフレーム抽出（動画→画像）</dd>
+    <dt>備考</dt><dd>自動の品質ゲート。粗い動画に説明文を付けて出す事故を防ぐ。最終の⚔️指揮官レビュー（人）はこの後の納品前に残す</dd>
+  </dl>
+</div>
+
+<div class="agent">
+  <div class="ah"><div class="ab">🗒️</div><div><div class="an">Agent 9 ── 説明文生成</div><div class="ar">Copy / Description</div></div></div>
+  <dl>
+    <dt>役割</dt><dd>レビューGO後、完成動画と企画書から、タイトル・説明文・SNS投稿文・字幕/概要を生成。</dd>
     <dt>入力</dt><dd>完成動画（尺・構成）＋企画書</dd>
     <dt>出力</dt><dd>説明文一式（媒体別に複数パターン）</dd>
     <dt>API</dt><dd>Claude <code>claude-sonnet-5</code></dd>
@@ -262,6 +274,7 @@
     <tr><td>素材生成</td><td class="api">Higgsfield 画像モデル / 別画像生成API</td><td>シーン画像・図・アイキャッチ</td><td>クレジット制／従量</td></tr>
     <tr><td>動画生成</td><td class="api">Higgsfield AI（公式API＋Python SDK）</td><td>映像・音声・リップシンク</td><td>クレジット制（サブスク＋トップアップ）</td></tr>
     <tr><td>動画編集</td><td class="api">ffmpeg ＋ Claude（編集指示）</td><td>結合・字幕・BGM・尺調整</td><td>自前計算（API料金ほぼ0）</td></tr>
+    <tr><td>動画レビュー</td><td class="api">Claude（vision）＋ ffmpeg</td><td>品質チェック・合否判定</td><td>トークン従量＋自前計算</td></tr>
     <tr><td>音声（任意）</td><td class="api">ElevenLabs / Google Neural2</td><td>別ナレーション（B-roll時）</td><td>文字数従量／月100万字無料枠</td></tr>
     <tr><td>連結/実行基盤</td><td class="api">オーケストレーション</td><td>8段の直列実行・リトライ・素材管理</td><td>自前スクリプト or ワークフローツール</td></tr>
   </tbody>
@@ -276,7 +289,7 @@
 <table>
   <thead><tr><th>コスト源</th><th>単価／本</th><th>効き</th></tr></thead>
   <tbody>
-    <tr><td>Claude（6エージェント合計）</td><td class="num">約 <b>$0.43</b></td><td class="cheap">小さい</td></tr>
+    <tr><td>Claude（各エージェント合計・レビュー含む）</td><td class="num">約 <b>$0.58</b></td><td class="cheap">小さい</td></tr>
     <tr><td>Tavily（調査）</td><td class="num">実質 <b>$0</b></td><td class="cheap">無視できる</td></tr>
     <tr><td>素材生成（画像 約8枚・推定）</td><td class="num">約 <b>$0.8</b></td><td class="cheap">小さい</td></tr>
     <tr><td>動画編集（ffmpeg・自前）</td><td class="num">約 <b>$0</b></td><td class="cheap">無視できる</td></tr>
@@ -285,11 +298,11 @@
   </tbody>
 </table>
 </div>
-<p style="font-size:12.5px;color:var(--muted)">※ 映像以外の固定費（Claude＋素材＋調査＋編集）＝<b>約 $1.2／本</b>。Claude内訳: 企画(Opus4.8)$0.17＋台本(Sonnet5)$0.05＋説明(Sonnet5)$0.04＋調査(Sonnet5)$0.08＋紐付け/整形(Haiku)$0.04＋編集指示(Sonnet5)$0.05。素材の画像クレジット単価は未確認のため推定。</p>
+<p style="font-size:12.5px;color:var(--muted)">※ 映像以外の固定費（Claude＋素材＋調査＋編集＋レビュー）＝<b>約 $1.4／本</b>。Claude内訳: 企画(Opus4.8)$0.17＋レビュー(Opus4.8 vision)$0.15＋台本(Sonnet5)$0.05＋説明(Sonnet5)$0.04＋調査(Sonnet5)$0.08＋紐付け/整形(Haiku)$0.04＋編集指示(Sonnet5)$0.05。素材の画像クレジット単価は未確認のため推定。</p>
 
 <div class="box warn">
   <div class="bt">◆ 結論は不変: コストは「動画の尺」でほぼ決まる</div>
-  エージェントを4→8体に増やしても、追加分（台本・素材・紐付け・編集）は合計 約$0.9/本で誤差レベル。<b>費用の9割超はいまも動画生成</b>で、尺にほぼ比例する。設計判断は依然「1本を何秒にするか」が最重要。
+  エージェントを4→9体に増やしても、追加分（台本・素材・紐付け・編集・レビュー）は合計 約$1.0/本で誤差レベル。<b>費用の9割超はいまも動画生成</b>で、尺にほぼ比例する。設計判断は依然「1本を何秒にするか」が最重要。
 </div>
 <div class="box info">
   <div class="bt">◆ ビルダー（メタ層）のコストは別枠・ビルド時のみ</div>
@@ -299,16 +312,16 @@
 <h3>4-2. 尺別シナリオ（月20本・Veo 3 Fast品質）</h3>
 <div class="tw">
 <table>
-  <thead><tr><th>動画の尺</th><th class="num">8秒クリップ数</th><th class="num">映像費／本</th><th class="num">本単価<br>(+固定費$1.2)</th><th class="num">月20本 合計</th></tr></thead>
+  <thead><tr><th>動画の尺</th><th class="num">8秒クリップ数</th><th class="num">映像費／本</th><th class="num">本単価<br>(+固定費$1.4)</th><th class="num">月20本 合計</th></tr></thead>
   <tbody>
-    <tr><td>ショート（30秒）</td><td class="num tnum">4</td><td class="num tnum">$3.1</td><td class="num tnum cheap">約 $4.3</td><td class="num tnum cheap">約 $86</td></tr>
-    <tr><td>ショート（60秒）</td><td class="num tnum">8</td><td class="num tnum">$6.2</td><td class="num tnum cheap">約 $7.4</td><td class="num tnum cheap">約 $148</td></tr>
-    <tr><td>ミドル（3分）</td><td class="num tnum">23</td><td class="num tnum">$17.7</td><td class="num tnum mid">約 $19</td><td class="num tnum mid">約 $380</td></tr>
-    <tr><td>ロング（10分）</td><td class="num tnum">75</td><td class="num tnum">$57.8</td><td class="num tnum exp">約 $59</td><td class="num tnum exp">約 $1,180</td></tr>
+    <tr><td>ショート（30秒）</td><td class="num tnum">4</td><td class="num tnum">$3.1</td><td class="num tnum cheap">約 $4.5</td><td class="num tnum cheap">約 $90</td></tr>
+    <tr><td>ショート（60秒）</td><td class="num tnum">8</td><td class="num tnum">$6.2</td><td class="num tnum cheap">約 $7.6</td><td class="num tnum cheap">約 $152</td></tr>
+    <tr><td>ミドル（3分）</td><td class="num tnum">23</td><td class="num tnum">$17.7</td><td class="num tnum mid">約 $19</td><td class="num tnum mid">約 $382</td></tr>
+    <tr><td>ロング（10分）</td><td class="num tnum">75</td><td class="num tnum">$57.8</td><td class="num tnum exp">約 $59</td><td class="num tnum exp">約 $1,184</td></tr>
   </tbody>
 </table>
 </div>
-<p style="font-size:12.5px;color:var(--muted)">※ リトライ（作り直し）除く基準値。生成映像は歩留まりで実際 <b>+20〜40%</b>を見込む。Premium画質は映像費が約2.6倍。手動素材でimage-to-videoを使うと生成の当たり率が上がり、リトライ削減＝実質コスト減も期待できる。</p>
+<p style="font-size:12.5px;color:var(--muted)">※ リトライ（作り直し）除く基準値。生成映像は歩留まりで実際 <b>+20〜40%</b>を見込む。Premium画質は映像費が約2.6倍。手動素材でimage-to-videoを使うと生成の当たり率が上がり、リトライ削減＝実質コスト減も期待できる。Agent 8のレビューで差し戻すと再生成/再編集が走るため、品質は上がるが尺次第で映像費が増える（＝レビュー基準の厳しさが歩留まりとコストのバランスを決める）。</p>
 
 <div class="box info">
   <div class="bt">◆ 尺と料金プラン（月20本）</div>
@@ -328,6 +341,7 @@
   <li><b>段間の整合性:</b> 8段に増えたぶん、素材↔シーン↔クリップのID対応が崩れると破綻する。台本を「唯一の定形ソース」にする設計が必須。</li>
   <li><b>素材の重複/過不足:</b> 素材生成とこちら提供素材が競合・不足しないよう、Agent 5で過不足検出を必ず入れる。</li>
   <li><b>編集の限界:</b> ffmpeg自動編集は「結合・字幕・BGM・尺調整」までが確実圏。凝った演出・テンポは人の最終調整前提。</li>
+  <li><b>レビュー基準の調整:</b> Agent 8の判定が緩いと粗が残り、厳しいと差し戻し＝再生成が増えてコスト膨張。基準（合格ライン）の調整が歩留まりと採算を左右する。無限ループ防止に差し戻し回数の上限も設ける。</li>
   <li><b>品質のばらつき:</b> 生成映像・画像は当たり外れがあり、リトライ＝追加クレジット前提。歩留まり+20〜40%を見込む。</li>
   <li><b>API仕様の未確定点:</b> Higgsfieldの音声/リップシンク・画像生成がAPI経由で叩けるか、画像クレジット単価は実装前に要検証。</li>
 </ul>
@@ -335,7 +349,7 @@
 <h2><span class="no">06</span> 段階導入案</h2>
 <div class="phase"><div class="pn">1</div><div class="pc"><div class="pt">上流の自動化（Agent 1〜3・8）</div><div class="pd">調査→企画→台本→説明文を自動化し、素材・生成・編集は手動。最小コストで「企画と台本の質」を検証。</div></div></div>
 <div class="phase"><div class="pn">2</div><div class="pc"><div class="pt">素材と生成の接続（Agent 4〜6）</div><div class="pd">素材生成・紐付け・Higgsfield生成をショート尺で接続。手動素材の受け渡し口と、1本あたり実コスト・歩留まりを実測。</div></div></div>
-<div class="phase"><div class="pn">3</div><div class="pc"><div class="pt">編集の自動化＋全自動運用（Agent 7）</div><div class="pd">ffmpeg編集を接続し8段を直列で自動実行。企画GOと最終納品前に指揮官レビューを挟む運用に。採算が見えたら尺・本数をスケール。</div></div></div>
+<div class="phase"><div class="pn">3</div><div class="pc"><div class="pt">編集・レビューの自動化＋全自動運用（Agent 7・8）</div><div class="pd">ffmpeg編集と自動レビューを接続し9段を直列で自動実行。<b>Agent 8の自動レビュー＋人の最終指揮官レビューの二段ゲート</b>に。採算が見えたら尺・本数をスケール。</div></div></div>
 
-<footer>AI動画コンテンツ製造ワークフロー 設計書 v3.0（8エージェント＋ビルダー）／ 価格は2026-07-09時点の調査値（Higgsfield公式はJSレンダリングのため一部第三者記事に依拠、要実測検証）。外部提出前に⚔️指揮官レビュー推奨。</footer>
+<footer>AI動画コンテンツ製造ワークフロー 設計書 v4.0（9エージェント＋ビルダー）／ 価格は2026-07-09時点の調査値（Higgsfield公式はJSレンダリングのため一部第三者記事に依拠、要実測検証）。外部提出前に⚔️指揮官レビュー推奨。</footer>
 </div>
