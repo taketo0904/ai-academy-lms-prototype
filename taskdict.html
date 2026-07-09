@@ -195,6 +195,33 @@
   .imgframe{aspect-ratio:16/9;border-radius:16px;display:grid;place-items:center;color:#fff;box-shadow:var(--shadow-lg);position:relative;text-align:center;max-width:760px}
   .imgframe .big{font-size:54px;filter:drop-shadow(0 4px 12px rgba(0,0,0,.25))}
   .imgframe .cap{position:absolute;bottom:14px;left:16px;right:16px;font-size:11.5px;color:rgba(255,255,255,.85)}
+  /* io definition */
+  .iorow{display:flex;gap:10px;align-items:stretch;margin-top:4px}
+  .iocell{flex:1;background:var(--canvas);border:1px solid var(--line);border-radius:10px;padding:11px 13px}
+  .iocell .ioh{font-size:10.5px;font-weight:800;color:var(--faint);letter-spacing:.05em;margin-bottom:4px}
+  .iocell .iov{font-size:12.5px;color:var(--ink);line-height:1.55}
+  .ioarrow{display:grid;place-items:center;color:var(--faint);font-size:18px;flex-shrink:0}
+  @media(max-width:560px){.iorow{flex-direction:column}.ioarrow{transform:rotate(90deg)}}
+  /* flow (連携ワークフロー) */
+  .flowrail{position:relative;max-width:760px;margin-top:6px}
+  .flowrail:before{content:"";position:absolute;left:16px;top:16px;bottom:20px;width:2px;background:var(--line-strong)}
+  .flowstep{display:flex;gap:14px;position:relative;margin-bottom:12px;align-items:flex-start}
+  .flowstep .fnode{width:34px;height:34px;border-radius:10px;background:var(--ink);color:#fff;display:grid;place-items:center;font-weight:800;font-size:13px;flex-shrink:0;z-index:1;box-shadow:0 0 0 4px var(--canvas)}
+  .flowstep.b .fnode{background:var(--coral)}
+  .fcard{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:12px 14px;flex:1;min-width:0;box-shadow:var(--shadow)}
+  .fcard .fn{font-weight:800;font-size:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .fbadge{font-size:10px;font-weight:800;background:var(--coral-wash);color:var(--coral);padding:2px 7px;border-radius:5px}
+  .fio{display:flex;gap:8px;align-items:center;margin-top:8px;font-size:11.5px;flex-wrap:wrap}
+  .fio .fin{background:var(--accent-wash);color:var(--accent-ink);padding:3px 9px;border-radius:6px;font-weight:600}
+  .fio .far{color:var(--faint)}
+  .fio .fout{background:var(--green-wash);color:var(--green);padding:3px 9px;border-radius:6px;font-weight:600}
+  /* 今月の新着 band */
+  .newband{background:linear-gradient(135deg,var(--accent-wash),#fff);border:1px solid var(--line-strong);border-radius:14px;padding:15px 17px;margin-bottom:22px}
+  .newband h4{margin:0 0 4px;font-size:13.5px;font-weight:800;display:flex;align-items:center;gap:8px}
+  .newband p{margin:0 0 11px;font-size:12px;color:var(--muted)}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip2{border:1px solid var(--line-strong);background:#fff;border-radius:20px;padding:6px 13px;font-size:12px;font-weight:700;color:var(--slate)}
+  .chip2:hover{background:var(--accent-wash);border-color:var(--accent);color:var(--accent-ink)}
 
   /* news feed */
   .newshead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
@@ -283,6 +310,74 @@ const TASKS=[
   {id:"t30",cat:"US03",code:"US03.3.1",mid:"障害対応",name:"障害対応の一次切り分け支援",status:"build",fresh:true,agent:null},
 ];
 
+/* 各タスクのエージェント定義（入力→出力）。未整備タスクは「作る想定の入出力」= 仕様。 */
+const IO={
+  t1:{in:"検索条件・ターゲット像・既存顧客台帳",out:"重複／営業済みを除いた新規リード一覧（会社・担当・連絡先）"},
+  t2:{in:"商談の音声またはメモ",out:"要約・決定事項・担当／期日つきタスク"},
+  t3:{in:"ヒアリング内容・要件",out:"課題〜打ち手〜見積骨子入りの提案書ドラフト"},
+  t4:{in:"項目・数量・単価・取引先",out:"体裁の整った見積書（PDF）"},
+  t5:{in:"顧客の状況・前回のやり取り",out:"トーンを合わせたフォロー文（複数案）"},
+  t6:{in:"受注メール／伝票",out:"整形済みの受注データ・集計表"},
+  t7:{in:"案件・金額・取引先",out:"請求書＋送付状況の管理表"},
+  t8:{in:"領収書・申請データ・規程",out:"規程違反・不備の指摘リスト"},
+  t9:{in:"募集要件・応募書類",out:"通過候補と評価根拠"},
+  t10:{in:"職務内容・条件",out:"媒体別の求人票"},
+  t11:{in:"契約書（NDA／委託等）",out:"不利な条項・欠落の指摘と修正案"},
+  t12:{in:"社内規程・問い合わせ内容",out:"根拠つきの回答文"},
+  t13:{in:"打刻データ",out:"月次の勤怠集計・アラート"},
+  t14:{in:"テーマ・媒体・トーン",out:"媒体別の投稿文＋ハッシュタグ"},
+  t15:{in:"ターゲット・訴求軸",out:"広告コピー複数案"},
+  t16:{in:"商品／オファー情報",out:"LPの構成・見出し・本文"},
+  t17:{in:"競合URL／名称",out:"訴求・ブランド要素の抽出と比較表"},
+  t18:{in:"目的・予算・期間",out:"キャンペーン企画案・スケジュール"},
+  t19:{in:"配信テーマ・訴求",out:"メルマガ本文（件名・本文・CTA）"},
+  t20:{in:"生データ（CSV等）",out:"欠損／表記ゆれ／型を整えた分析用データ"},
+  t21:{in:"表データ・見たい指標",out:"グラフ・ダッシュボード"},
+  t22:{in:"分析済みデータ",out:"要点・示唆をまとめたレポート"},
+  t23:{in:"自由記述コメント",out:"論点別の分類＋代表意見の要約"},
+  t24:{in:"ゴール・制約",out:"担当・期日つきのWBS"},
+  t25:{in:"進捗状況・課題",out:"進捗報告書（状況／課題／次アクション）"},
+  t26:{in:"議事録",out:"担当・期日つきタスク一覧"},
+  t27:{in:"プロジェクト概要",out:"リスク一覧（影響／対策）"},
+  t28:{in:"問い合わせログ",out:"種別・緊急度別の分類と振り分け"},
+  t29:{in:"操作フロー",out:"運用手順書・チェックリスト"},
+  t30:{in:"ログ・アラート",out:"原因候補・一次対応の提示"},
+};
+
+/* 特化型エージェントの複数連携（万能1体でなく、タスク特化を直列につなぐ）。=「スキル図」。 */
+const S=(agent,inp,out,build)=>({agent,in:inp,out,build:!!build});
+const WORKFLOWS=[
+  {id:"wf1",name:"AI動画コンテンツ 量産",grad:"linear-gradient(135deg,#5B4BE1,#8b7bf0)",
+   desc:"調査から説明文まで9体の特化エージェントを直列連携。動画を量産する製造ライン。",
+   steps:[
+     S("AI情報 調査","テーマ／期間","トレンド要約"),
+     S("動画企画","トレンド要約","企画書"),
+     S("台本作成","企画書","シーン台本"),
+     S("素材生成","台本","画像素材"),
+     S("素材×台本 紐付け","台本＋素材","ショットリスト"),
+     S("動画生成","ショットリスト（＋手動素材）","動画クリップ"),
+     S("動画編集","クリップ＋台本","完成動画"),
+     S("動画レビュー","完成動画＋台本","GO／差し戻し"),
+     S("説明文生成","完成動画＋企画","タイトル・説明文一式"),
+   ]},
+  {id:"wf2",name:"新規リード獲得 → 受注フォロー",grad:"linear-gradient(135deg,#0EA5E9,#5B4BE1)",
+   desc:"営業の前後工程を5体で連携。リスト作成から商談後のフォローまで自動化。",
+   steps:[
+     S("リストアップ・スキル","検索条件","新規リード"),
+     S("提案書ドラフト生成","ヒアリング","提案書ドラフト"),
+     S("議事録エージェント","商談メモ","議事録＋タスク"),
+     S("タスク抽出AI","議事録","担当／期日タスク"),
+     S("メール返信ドラフト","顧客状況","フォロー文"),
+   ]},
+  {id:"wf3",name:"採用オペレーション",grad:"linear-gradient(135deg,#12B76A,#0d8a52)",
+   desc:"求人からスクリーニングまでを3体で連携。採用の初動を効率化。",
+   steps:[
+     S("求人票ジェネレーター","職務要件","求人票"),
+     S("採用スクリーニングAI","応募書類","通過候補＋根拠"),
+     S("面接調整エージェント","候補者・空き枠","面接日程調整",true),
+   ]},
+];
+
 /* =====================================================================
    時事ニュース フィード。収集エージェント（Web検索→要約）が自動投稿する場所。
    本番ではこの配列に、収集エージェントが継続的にアイテムを追加する。
@@ -322,7 +417,7 @@ const OKEY="task-agents-owned-v2";
 let owned=new Set(JSON.parse(localStorage.getItem(OKEY)||"[]"));
 const saveOwned=()=>localStorage.setItem(OKEY,JSON.stringify([...owned]));
 const catOf=code=>CATS.find(c=>c.code===code);
-let state={cat:"all",view:"grid",q:"",route:"library",taskId:null,level:"beg",lessonId:null};
+let state={cat:"all",view:"grid",q:"",route:"library",taskId:null,level:"beg",lessonId:null,flowId:null};
 let liveNews=NEWS.map(n=>({...n})),newsTimer=null,extraIdx=0,justPushed=null;
 function ago(min){if(min<1)return"たった今";if(min<60)return`${min}分前`;if(min<1440)return`${Math.floor(min/60)}時間前`;return`${Math.floor(min/1440)}日前`;}
 
@@ -381,11 +476,16 @@ function renderSide(){
     g.appendChild(b);
   });
   nav.appendChild(g);
-  const gn=el("div","grp");gn.appendChild(el("div","ttl","情報"));
+  const gn=el("div","grp");gn.appendChild(el("div","ttl","情報・連携"));
   const nb=el("button","navitem"+(state.route==="news"?" active":""));
   nb.innerHTML=`<span class="ic">🗞️</span><span>時事ニュース</span><span class="newtag">自動更新</span>`;
   nb.onclick=()=>{state.route="news";renderAll();window.scrollTo(0,0);};
-  gn.appendChild(nb);nav.appendChild(gn);
+  gn.appendChild(nb);
+  const fb=el("button","navitem"+(state.route==="flows"||state.route==="flow"?" active":""));
+  fb.innerHTML=`<span class="ic">🔗</span><span>連携ワークフロー</span><span class="ct tnum">${WORKFLOWS.length}</span>`;
+  fb.onclick=()=>{state.route="flows";renderAll();window.scrollTo(0,0);};
+  gn.appendChild(fb);
+  nav.appendChild(gn);
   const g2=el("div","grp");g2.appendChild(el("div","ttl","マイページ"));
   const mb=el("button","navitem"+(state.route==="mine"?" active":""));
   mb.innerHTML=`<span class="ic">🤖</span><span>マイエージェント</span>`+(myCount()?`<span class="ct tnum">${myCount()}</span>`:`<span class="newtag">NEW</span>`);
@@ -420,6 +520,14 @@ function renderLibrary(){
 
   const wrap=el("div","contentgrid");
   const col=el("div");
+  if(state.cat==="all"&&!state.q){
+    const band=el("div","newband");
+    band.innerHTML=`<h4>🆕 今月の新着スキル・スキル図</h4><p>毎月、新しいエージェントと連携ワークフロー（スキル図）を追加。継続利用の価値をここで更新し続けます。</p>`;
+    const chips=el("div","chips");
+    WORKFLOWS.forEach(w=>{const c=el("button","chip2",`🔗 ${w.name}`);c.onclick=()=>{state.route="flow";state.flowId=w.id;renderAll();window.scrollTo(0,0);};chips.appendChild(c);});
+    ["t11","t14"].forEach(id=>{const t=TASKS.find(x=>x.id===id);if(t&&t.agent){const c=el("button","chip2",`🤖 ${t.agent.name}`);c.onclick=()=>{state.route="detail";state.taskId=id;renderAll();window.scrollTo(0,0);};chips.appendChild(c);}});
+    band.appendChild(chips);col.appendChild(band);
+  }
   if(list.length===0){col.appendChild(el("div","empty",`<div class="big">🔍</div>該当する業務タスクがありません。`));}
   else{
     const groups=[];list.forEach(t=>{let g=groups.find(x=>x.mid===t.mid&&x.cat===t.cat);if(!g){g={mid:t.mid,cat:t.cat,items:[]};groups.push(g);}g.items.push(t);});
@@ -492,6 +600,11 @@ function renderDetail(){
   const dg=el("div","dgrid");
   const left=el("div");
   left.appendChild(el("div","dsec",`<div class="lb">この業務でできること</div><p>${t.name}を、AIエージェントに任せて短時間で仕上げます。入力を渡すだけで、下書き・整形・チェックまでを自動化。学ぶのではなく「すぐ使える」を実現します。</p>`));
+  const io=IO[t.id];
+  if(io){left.appendChild(el("div","dsec",`<div class="lb">エージェント定義（入力 → 出力）${t.status==="build"?" ・ 作成時の想定仕様":""}</div>
+    <div class="iorow"><div class="iocell"><div class="ioh">入力</div><div class="iov">${io.in}</div></div>
+    <div class="ioarrow">→</div>
+    <div class="iocell"><div class="ioh">出力</div><div class="iov">${io.out}</div></div></div>`));}
   if(t.fresh){
     left.appendChild(el("div","dsec",`<div class="lb">新鮮情報（パーソナライズ）</div>
       <div class="freshcard"><div class="ft">✦ この業務に効く最新AI情報 <span class="persona">あなた向け</span></div>
@@ -529,6 +642,45 @@ function renderMine(){
   v.appendChild(el("p","libsub","受け取り済みのエージェント。各業務ですぐ使えます。"));
   if(mine.length===0){v.appendChild(el("div","empty",`<div class="big">🤖</div>まだ受け取ったエージェントはありません。<br>業務辞書からタスクを開いて「受け取る」を押してください。`));return;}
   const grid=el("div","cards grid");mine.forEach(t=>grid.appendChild(taskCard(t)));v.appendChild(grid);
+}
+
+/* 連携ワークフロー（特化型エージェントの複数連携＝スキル図） */
+function renderFlows(){
+  const v=$("#view");v.innerHTML="";
+  v.appendChild(el("div","crumb",`<b>情報・連携</b> / 連携ワークフロー`));
+  const head=el("div","libhead");head.innerHTML=`<h1><span>🔗</span> 連携ワークフロー（スキル図）</h1>`;
+  head.appendChild(el("span","count",`${WORKFLOWS.length} 本`));v.appendChild(head);
+  v.appendChild(el("p","libsub","万能な1体ではなく、<b>タスクに特化した複数のエージェントを直列で連携</b>させ、業務を丸ごと自動化します。各工程の「入力→出力」がつながって1つの成果になります。"));
+  const grid=el("div","cards grid");
+  WORKFLOWS.forEach(w=>{
+    const card=el("button","card");
+    card.innerHTML=`<div class="thumb" style="background:${w.grad}"><span class="stat ready">🔗 連携</span><span class="glyph">🔗</span><span class="code">${w.steps.length}体</span></div>
+      <div class="body"><div class="title">${w.name}</div><div class="meta">${w.desc}</div></div>`;
+    card.onclick=()=>{state.route="flow";state.flowId=w.id;renderAll();window.scrollTo(0,0);};
+    grid.appendChild(card);
+  });
+  v.appendChild(grid);
+}
+function renderFlow(){
+  const w=WORKFLOWS.find(x=>x.id===state.flowId);if(!w){state.route="flows";return renderFlows();}
+  const v=$("#view");v.innerHTML="";
+  const wrap=el("div","detail");
+  const back=el("button","backbtn","← 連携ワークフロー一覧に戻る");back.onclick=()=>{state.route="flows";renderAll();window.scrollTo(0,0);};
+  wrap.appendChild(back);
+  const hero=el("div","hero");hero.style.background=w.grad;
+  hero.innerHTML=`<div class="hcode">${w.steps.length}体の特化エージェント連携</div><h1>${w.name}</h1><div class="hmeta"><span>${w.desc}</span></div><div class="hglyph">🔗</div>`;
+  wrap.appendChild(hero);
+  wrap.appendChild(el("div","dsec",`<div class="lb" style="margin-top:22px">連携の流れ（入力 → 出力がつながる）</div>`));
+  const rail=el("div","flowrail");
+  w.steps.forEach((s,i)=>{
+    const st=el("div","flowstep"+(s.build?" b":""));
+    st.innerHTML=`<div class="fnode">${i+1}</div>
+      <div class="fcard"><div class="fn">${s.agent}${s.build?`<span class="fbadge">未整備・1日で作成</span>`:``}</div>
+      <div class="fio"><span class="fin">入 ${s.in}</span><span class="far">→</span><span class="fout">出 ${s.out}</span></div></div>`;
+    rail.appendChild(st);
+  });
+  wrap.appendChild(rail);
+  v.appendChild(wrap);
 }
 
 /* セットアップ（用語・使い方の動画/画像レクチャー環境） */
@@ -624,7 +776,7 @@ function renderNews(){
   const head=el("div","newshead");
   head.innerHTML=`<h1 style="font-size:21px;font-weight:800;margin:0">🗞️ 時事ニュース</h1><span class="live"><span class="pulse"></span>自動更新中</span><span style="font-size:12px;color:var(--faint)">最終更新: たった今</span>`;
   v.appendChild(head);
-  v.appendChild(el("p","libsub","AI・業務に関わる最新情報を、収集エージェントが<b>自動で収集・要約して投稿</b>し続けます。各ニュースは関連する業務タスクに紐づき、そのまま使えるエージェントへ移動できます。"));
+  v.appendChild(el("p","libsub","AI・業務に関わる最新情報を、収集エージェントが<b>自動で収集・要約して投稿</b>し続けます。<b>過去に出した情報とは重複しないよう生成</b>し、各ニュースは関連する業務タスクに紐づいて、そのまま使えるエージェントへ移動できます。"));
   const feed=el("div","feed");
   liveNews.forEach(n=>feed.appendChild(newsCard(n)));
   v.appendChild(feed);
@@ -634,8 +786,14 @@ function startNewsFeed(){
   stopNewsFeed();
   newsTimer=setInterval(()=>{
     if(state.route!=="news"){stopNewsFeed();return;}
-    liveNews.forEach(n=>n.min=(n.min||0)+ (n.min<60?1:60)); // 既存を少し古く
-    const src=EXTRA_NEWS[extraIdx%EXTRA_NEWS.length];extraIdx++;
+    // 「過去情報と重複しない」制約: 既出タイトルはスキップして次の候補を採用
+    let src=null;
+    for(let k=0;k<EXTRA_NEWS.length;k++){
+      const cand=EXTRA_NEWS[(extraIdx+k)%EXTRA_NEWS.length];
+      if(!liveNews.some(n=>n.title===cand.title)){src=cand;extraIdx+=k+1;break;}
+    }
+    if(!src){return;} // 全て既出なら投稿しない（重複を出さない）
+    liveNews.forEach(n=>n.min=(n.min||0)+(n.min<60?1:60));
     const item={...src,id:"live"+extraIdx,min:0};
     liveNews.unshift(item);justPushed=item.id;
     if(liveNews.length>16)liveNews.pop();
@@ -673,6 +831,8 @@ function renderAll(){
   else if(state.route==="news")renderNews();
   else if(state.route==="setup")renderSetup();
   else if(state.route==="lesson")renderLesson();
+  else if(state.route==="flows")renderFlows();
+  else if(state.route==="flow")renderFlow();
   else renderLibrary();
 }
 $(".icobtn[title='お知らせ']").onclick=()=>{state.route="news";renderAll();window.scrollTo(0,0);};
