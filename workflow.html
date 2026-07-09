@@ -1,0 +1,287 @@
+<title>AI動画コンテンツ製造ワークフロー 設計書</title>
+<style>
+  :root{
+    --paper:#F6F7F4;
+    --card:#FFFFFF;
+    --ink:#1A2233;
+    --muted:#5B6472;
+    --faint:#8A93A3;
+    --line:#E3E6E1;
+    --line2:#CDD2CB;
+    --teal:#0F766E;
+    --teal-wash:#E2F1EF;
+    --amber:#B45309;
+    --amber-wash:#FBEEDC;
+    --green:#15803D;
+    --green-wash:#E4F3E8;
+    --red:#B91C1C;
+    --red-wash:#FBE9E7;
+    --slate:#334155;
+    --shadow:0 1px 2px rgba(26,34,51,.05),0 6px 20px rgba(26,34,51,.05);
+    --font:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",Meiryo,sans-serif;
+    --mono:"SF Mono",ui-monospace,"DejaVu Sans Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{font-family:var(--font);color:var(--ink);background:var(--paper);line-height:1.75;-webkit-font-smoothing:antialiased}
+  .tnum{font-variant-numeric:tabular-nums}
+  .wrap{max-width:920px;margin:0 auto;padding:44px 24px 90px}
+
+  /* header */
+  header{border-bottom:2px solid var(--ink);padding-bottom:24px;margin-bottom:14px}
+  .kicker{font-size:12px;font-weight:700;letter-spacing:.16em;color:var(--teal);text-transform:uppercase;margin-bottom:12px}
+  h1{font-size:clamp(26px,4vw,36px);line-height:1.25;margin:0 0 14px;font-weight:800;letter-spacing:-.01em;text-wrap:balance}
+  .lede{font-size:16.5px;color:var(--muted);margin:0;max-width:64ch}
+  .meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+  .chip{font-size:12px;font-weight:600;background:var(--card);border:1px solid var(--line2);border-radius:20px;padding:5px 13px;color:var(--slate)}
+  .chip b{color:var(--ink)}
+
+  h2{font-size:20px;font-weight:800;margin:52px 0 6px;letter-spacing:-.01em;display:flex;align-items:baseline;gap:12px}
+  h2 .no{font-size:13px;font-weight:800;color:var(--teal);font-variant-numeric:tabular-nums;background:var(--teal-wash);border-radius:7px;padding:2px 9px;flex-shrink:0}
+  h2+.sub{color:var(--muted);font-size:14.5px;margin:0 0 22px}
+  h3{font-size:15.5px;font-weight:800;margin:30px 0 10px}
+  p{margin:0 0 14px}
+  a{color:var(--teal);text-decoration:none;border-bottom:1px solid var(--teal-wash)}
+
+  /* pipeline */
+  .pipe{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin:26px 0 8px;align-items:stretch}
+  @media(max-width:760px){.pipe{grid-template-columns:1fr}}
+  .stage{background:var(--card);border:1px solid var(--line2);border-radius:12px;padding:15px 15px 16px;position:relative;box-shadow:var(--shadow)}
+  .pipe .stage:not(:last-child){margin-right:26px}
+  @media(max-width:760px){.pipe .stage:not(:last-child){margin-right:0;margin-bottom:30px}}
+  .stage .arw{position:absolute;top:50%;right:-24px;transform:translateY(-50%);color:var(--line2);font-size:22px;z-index:2}
+  @media(max-width:760px){.stage .arw{top:auto;right:50%;bottom:-27px;transform:translateX(50%) rotate(90deg)}}
+  .stage .sn{font-size:11px;font-weight:800;color:var(--faint);letter-spacing:.08em}
+  .stage .si{font-size:26px;margin:6px 0 4px}
+  .stage .st{font-size:14px;font-weight:800;line-height:1.35;margin-bottom:6px}
+  .stage .sd{font-size:11.5px;color:var(--muted);line-height:1.5}
+  .stage .sio{margin-top:11px;padding-top:10px;border-top:1px dashed var(--line);font-size:10.5px;color:var(--faint);line-height:1.7}
+  .stage .sio b{color:var(--slate);font-weight:700}
+
+  /* agent detail cards */
+  .agent{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--teal);border-radius:10px;padding:18px 20px;margin-bottom:16px;box-shadow:var(--shadow)}
+  .agent .ah{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+  .agent .ab{width:38px;height:38px;border-radius:10px;background:var(--teal-wash);display:grid;place-items:center;font-size:19px;flex-shrink:0}
+  .agent .an{font-size:16px;font-weight:800}
+  .agent .ar{font-size:12px;color:var(--muted);font-weight:600}
+  .agent dl{display:grid;grid-template-columns:88px 1fr;gap:8px 16px;margin:0;font-size:13.5px}
+  @media(max-width:560px){.agent dl{grid-template-columns:1fr}}
+  .agent dt{font-weight:700;color:var(--faint);font-size:11.5px;letter-spacing:.03em;padding-top:2px}
+  .agent dd{margin:0;color:var(--slate)}
+  .agent dd code,.agent dd .api{font-family:var(--mono);font-size:12px;background:var(--paper);border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--ink)}
+
+  /* tables */
+  .tw{overflow-x:auto;margin:16px 0 6px;border:1px solid var(--line);border-radius:10px}
+  table{border-collapse:collapse;width:100%;font-size:13.5px;background:var(--card);min-width:520px}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--paper);font-size:11.5px;font-weight:800;color:var(--muted);letter-spacing:.03em;white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  td .api{font-family:var(--mono);font-size:12px}
+  .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .tot td{background:var(--teal-wash);font-weight:800}
+  .cheap{color:var(--green);font-weight:700}
+  .mid{color:var(--amber);font-weight:700}
+  .exp{color:var(--red);font-weight:700}
+
+  /* callouts */
+  .box{border-radius:10px;padding:15px 18px;margin:16px 0;font-size:13.5px;line-height:1.7}
+  .box .bt{font-weight:800;font-size:13px;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+  .box.warn{background:var(--amber-wash);border:1px solid #eccf9f}
+  .box.warn .bt{color:var(--amber)}
+  .box.info{background:var(--teal-wash);border:1px solid #b8ded9}
+  .box.info .bt{color:var(--teal)}
+  .box.risk{background:var(--red-wash);border:1px solid #f0c5bf}
+  .box.risk .bt{color:var(--red)}
+
+  ul,ol{margin:6px 0 16px;padding-left:22px}
+  li{margin-bottom:6px}
+  .phase{display:flex;gap:14px;margin-bottom:14px;align-items:flex-start}
+  .phase .pn{flex-shrink:0;width:30px;height:30px;border-radius:8px;background:var(--ink);color:#fff;display:grid;place-items:center;font-weight:800;font-size:13px}
+  .phase .pc .pt{font-weight:800;font-size:14.5px}
+  .phase .pc .pd{font-size:13px;color:var(--muted)}
+  .fill{background:repeating-linear-gradient(45deg,var(--paper),var(--paper) 8px,#eef0ec 8px,#eef0ec 16px);border:1px dashed var(--line2);border-radius:8px;padding:12px 16px;font-size:12.5px;color:var(--faint);font-style:italic}
+  footer{margin-top:60px;padding-top:18px;border-top:1px solid var(--line);font-size:12px;color:var(--faint)}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="kicker">Workflow Design · 設計書</div>
+  <h1>AI動画コンテンツ 製造ワークフロー</h1>
+  <p class="lede">Xを含むWeb上のAI情報を調査し、動画企画→動画生成→説明文までを4体のエージェントで連結する、月20本規模の量産パイプライン。使用APIと概算コストを含む設計仕様。</p>
+  <div class="meta">
+    <span class="chip">前提: <b>月20本以上</b></span>
+    <span class="chip">動画: <b>Higgsfield AI</b></span>
+    <span class="chip">調査: <b>Web検索（低コスト代替）</b></span>
+    <span class="chip">LLM: <b>Claude</b></span>
+    <span class="chip">作成: <b>2026-07-09</b></span>
+  </div>
+</header>
+
+<h2><span class="no">01</span> 全体像</h2>
+<p class="sub">4エージェントを直列につなぎ、各段の出力が次段の入力になる。人が挟まるのは「企画GO判断」と「最終レビュー」の2点のみ。</p>
+
+<div class="pipe">
+  <div class="stage">
+    <div class="sn">AGENT 1</div>
+    <div class="si">🔍</div>
+    <div class="st">AI情報 調査</div>
+    <div class="sd">X/Web上の最新AIトレンド・話題を収集し、要点を構造化。</div>
+    <div class="sio"><b>入力</b> テーマ/期間<br><b>出力</b> トレンド要約（構造化テキスト）</div>
+    <div class="arw">→</div>
+  </div>
+  <div class="stage">
+    <div class="sn">AGENT 2</div>
+    <div class="si">📝</div>
+    <div class="st">動画企画 立案</div>
+    <div class="sd">調査結果から動画コンテンツの企画案をテキスト書式で生成。</div>
+    <div class="sio"><b>入力</b> トレンド要約<br><b>出力</b> 企画書（構成・尺・シーン）</div>
+    <div class="arw">→</div>
+  </div>
+  <div class="stage">
+    <div class="sn">AGENT 3</div>
+    <div class="si">🎬</div>
+    <div class="st">動画 生成</div>
+    <div class="sd">企画のシーン記述をプロンプト化し、Higgsfieldで映像を生成。</div>
+    <div class="sio"><b>入力</b> シーン記述<br><b>出力</b> 動画クリップ</div>
+    <div class="arw">→</div>
+  </div>
+  <div class="stage">
+    <div class="sn">AGENT 4</div>
+    <div class="si">🗒️</div>
+    <div class="st">説明文 生成</div>
+    <div class="sd">完成動画のタイトル・説明文・投稿文・字幕を生成。</div>
+    <div class="sio"><b>入力</b> 企画＋動画<br><b>出力</b> 説明文一式</div>
+  </div>
+</div>
+
+<div class="box info">
+  <div class="bt">◆ オーケストレーションの考え方</div>
+  各エージェントは独立したステップとして呼び出し、前段の構造化出力（JSON/Markdown）を次段の入力に渡す。段間の整合性を保つため、企画書は<b>機械可読な定形フォーマット</b>（シーンごとにID・尺・プロンプト・ナレーション）で持たせるのが要。動画生成だけは非同期・失敗リトライ前提で組む。
+</div>
+
+<h2><span class="no">02</span> 各エージェント仕様</h2>
+<p class="sub">役割・入出力・使用API/モデルの詳細。モデルは難易度に応じて出し分ける（調査/企画は高性能、定型生成は低コスト）。</p>
+
+<div class="agent">
+  <div class="ah"><div class="ab">🔍</div><div><div class="an">Agent 1 ── AI情報 調査エージェント</div><div class="ar">Research / Trend Scan</div></div></div>
+  <dl>
+    <dt>役割</dt><dd>指定テーマ（例:「建築×AI」「生成AIの最新動向」）で、X・ニュース・技術ブログ等から直近の話題を収集し、企画に使える粒度に要約・分類する。</dd>
+    <dt>入力</dt><dd>調査テーマ、対象期間（例: 直近7日）、除外条件</dd>
+    <dt>出力</dt><dd>トレンド要約（トピック名・要点・出典URL・話題度）を構造化テキストで</dd>
+    <dt>API</dt><dd><span class="api">Tavily API</span>（無料枠1,000クレジット/月・超過$0.008/クレジット）＋ Claude <code>claude-sonnet-5</code> で要約・構造化。Claudeの <code>web_search</code> サーバーツールでAPI一本化も可</dd>
+    <dt>備考</dt><dd>Xの生投稿が必須でないため公式X API（月$200〜）は不要。Tavilyならこの用途は<b>実質無料枠内</b></dd>
+  </dl>
+</div>
+
+<div class="agent">
+  <div class="ah"><div class="ab">📝</div><div><div class="an">Agent 2 ── 動画企画 立案エージェント</div><div class="ar">Content Planning（テキスト書式出力）</div></div></div>
+  <dl>
+    <dt>役割</dt><dd>調査要約を受け、動画1本の企画書を生成。タイトル案・狙い・ターゲット・全体尺・シーン割り（各シーンの秒数・映像プロンプト・ナレーション原稿）まで落とす。</dd>
+    <dt>入力</dt><dd>Agent 1のトレンド要約、フォーマット指定（尺・トンマナ・本数）</dd>
+    <dt>出力</dt><dd>企画書（Markdown＋機械可読なシーンJSON）。これがAgent 3/4の共通ソースになる</dd>
+    <dt>API</dt><dd>Claude <code>claude-opus-4-8</code>（企画の質が全体を左右するため最上位モデル）。構造化出力で定形JSONを保証</dd>
+    <dt>備考</dt><dd>ここで人の「GO/差し戻し」判断を1回挟むのが安全（動画生成は高コストなため手戻り防止）</dd>
+  </dl>
+</div>
+
+<div class="agent">
+  <div class="ah"><div class="ab">🎬</div><div><div class="an">Agent 3 ── 動画生成エージェント</div><div class="ar">Video Generation（Higgsfield）</div></div></div>
+  <dl>
+    <dt>役割</dt><dd>企画書のシーン記述を Higgsfield 向けプロンプトに変換し、クリップを生成。シーンを繋いで1本に構成。</dd>
+    <dt>入力</dt><dd>シーンJSON（プロンプト・尺・参照画像）</dd>
+    <dt>出力</dt><dd>動画クリップ（→結合して完成動画）</dd>
+    <dt>API</dt><dd>Higgsfield AI ── <b>公式REST API＋公式Python SDK あり</b>（<span class="api">docs.higgsfield.ai</span> / <span class="api">higgsfield-client</span>）。クレジット制（8秒クリップ ≈ 22クレジット〜）。プロンプト整形は Claude <code>claude-haiku-4-5</code></dd>
+    <dt>備考</dt><dd>公式APIで<b>完全自動化が可能</b>（ブラウザ自動化不要）。音声・リップシンク（Speak/Lipsync）内蔵で、話す動画なら音声もHiggsfield側で完結。1クリップ5〜8秒が基本＝長尺は結合前提</dd>
+  </dl>
+</div>
+
+<div class="agent">
+  <div class="ah"><div class="ab">🗒️</div><div><div class="an">Agent 4 ── 説明文生成エージェント</div><div class="ar">Copy / Description</div></div></div>
+  <dl>
+    <dt>役割</dt><dd>完成動画と企画書から、公開用のタイトル・説明文・SNS投稿文・字幕/概要を生成。</dd>
+    <dt>入力</dt><dd>企画書＋動画（尺・シーン構成）</dd>
+    <dt>出力</dt><dd>説明文一式（媒体別に複数パターン）</dd>
+    <dt>API</dt><dd>Claude <code>claude-sonnet-5</code>（定型コピー生成、コストと質のバランス）</dd>
+    <dt>備考</dt><dd>ナレーション音声が要る場合、話す動画はHiggsfield内蔵音声で完結。B-roll＋別ナレーションなら <span class="api">ElevenLabs</span>（$0.10/1,000字・日本語最高品質）or <span class="api">Google Neural2</span>（月100万字無料）を併用</dd>
+  </dl>
+</div>
+
+<h2><span class="no">03</span> 技術スタック / API一覧</h2>
+<p class="sub">各段で使う外部サービスと役割の対応表。単価は第4章で確定。</p>
+<div class="tw">
+<table>
+  <thead><tr><th>層</th><th>サービス / モデル</th><th>役割</th><th>提供形態</th></tr></thead>
+  <tbody>
+    <tr><td>調査</td><td class="api">Tavily API</td><td>AI情報の収集</td><td>無料枠1,000cr/月＋従量$0.008/cr</td></tr>
+    <tr><td>LLM（調査/企画/説明）</td><td class="api">Claude（Opus 4.8 / Sonnet 5 / Haiku 4.5）</td><td>要約・企画・コピー生成</td><td>トークン従量API</td></tr>
+    <tr><td>動画生成</td><td class="api">Higgsfield AI（公式API＋Python SDK）</td><td>映像・音声・リップシンク</td><td>クレジット制（サブスク＋トップアップ）</td></tr>
+    <tr><td>音声（任意）</td><td class="api">ElevenLabs / Google Neural2</td><td>別ナレーション（B-roll時）</td><td>文字数従量／月100万字無料枠</td></tr>
+    <tr><td>連結/実行基盤</td><td class="api">オーケストレーション</td><td>4段の直列実行・リトライ・保存</td><td>自前スクリプト or ワークフローツール</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2><span class="no">04</span> コスト試算</h2>
+<p class="sub">前提: 月20本、1本あたりの各API消費を積み上げる。Claude料金は確定済み、Higgsfield・Web検索・TTSは調査結果で確定させる。</p>
+<h3>4-1. 単価の実態</h3>
+<div class="tw">
+<table>
+  <thead><tr><th>コスト源</th><th>単価</th><th>本ワークフローでの効き</th></tr></thead>
+  <tbody>
+    <tr><td>Claude（4エージェント合計）</td><td class="num">約 <b>$0.30</b>／本</td><td class="cheap">ごく小さい</td></tr>
+    <tr><td>Tavily（調査）</td><td class="num">実質 <b>$0</b>（無料枠内）</td><td class="cheap">無視できる</td></tr>
+    <tr><td>Higgsfield 映像（Veo 3 Fast）</td><td class="num">約 <b>$0.10</b>／秒</td><td class="exp">支配的</td></tr>
+    <tr><td>Higgsfield 映像（Premium 1080p）</td><td class="num">約 <b>$0.26</b>／秒</td><td class="exp">支配的（Fastの約2.6倍）</td></tr>
+    <tr><td>ElevenLabs（別ナレーション・任意）</td><td class="num">約 <b>$0.2〜0.3</b>／本</td><td class="cheap">小さい</td></tr>
+  </tbody>
+</table>
+</div>
+<p style="font-size:12.5px;color:var(--muted)">※ クレジット単価は Ultra年払い ≈ $0.033／トップアップ ≈ $0.05。1クリップ8秒＝22クレジット(Fast)を基準に $0.035／クレジットで算出。Claude内訳: 調査(Sonnet5)$0.08＋企画(Opus4.8)$0.17＋整形(Haiku)$0.02＋説明(Sonnet5)$0.04。</p>
+
+<div class="box warn">
+  <div class="bt">◆ 結論: コストは「動画の尺」でほぼ決まる</div>
+  Claude・調査・音声は合わせても1本$0.5前後で誤差レベル。<b>費用の9割以上が動画生成</b>で、しかも尺にほぼ比例する。つまり設計判断は「1本を何秒にするか」が最重要。生成AI映像は5〜8秒クリップの積み上げなので、10分尺は約75クリップ＝高額になる。
+</div>
+
+<h3>4-2. 尺別シナリオ（月20本・Veo 3 Fast品質）</h3>
+<div class="tw">
+<table>
+  <thead><tr><th>動画の尺</th><th class="num">8秒クリップ数</th><th class="num">映像費／本</th><th class="num">本単価<br>(+Claude+調査)</th><th class="num">月20本 合計</th></tr></thead>
+  <tbody>
+    <tr><td>ショート（30秒）</td><td class="num tnum">4</td><td class="num tnum">$3.1</td><td class="num tnum cheap">約 $3.4</td><td class="num tnum cheap">約 $68</td></tr>
+    <tr><td>ショート（60秒）</td><td class="num tnum">8</td><td class="num tnum">$6.2</td><td class="num tnum cheap">約 $6.5</td><td class="num tnum cheap">約 $130</td></tr>
+    <tr><td>ミドル（3分）</td><td class="num tnum">23</td><td class="num tnum">$17.7</td><td class="num tnum mid">約 $18</td><td class="num tnum mid">約 $360</td></tr>
+    <tr><td>ロング（10分）</td><td class="num tnum">75</td><td class="num tnum">$57.8</td><td class="num tnum exp">約 $58</td><td class="num tnum exp">約 $1,160</td></tr>
+  </tbody>
+</table>
+</div>
+<p style="font-size:12.5px;color:var(--muted)">※ 上表はリトライ（作り直し）を含まない基準値。生成映像は当たり外れがあるため、<b>歩留まりで実際は +20〜40%</b>を見込む（例: 10分尺・月20本なら実質 $1,400〜1,600/月）。Premium画質は各費用が約2.6倍。</p>
+
+<div class="box info">
+  <div class="bt">◆ 尺と料金プランの対応（月20本）</div>
+  月の必要クレジットで契約プランが決まる。<b>ショート30秒×20本 ≈ 1,760クレジット/月</b>なら Ultra 1契約（3,000cr・年払い$99/月）で収まる。<b>10分×20本 ≈ 33,000クレジット/月</b>だと Ultra＋大量トップアップが必要で、月$1,000超。長尺を量産するなら「話すアバター（InfiniteTalk・長尺対応）」で1本を1〜数クリップに畳む方がクリップ数＝コストを抑えられる可能性が高い（※アバター系の正確なクレジット単価は要実測）。
+</div>
+
+<h2><span class="no">05</span> リスク・未確定論点</h2>
+<div class="box info">
+  <div class="bt">✓ 解消: Higgsfieldの自動化可否</div>
+  当初の最大懸念だった「動画生成段の自動化」は、Higgsfieldに<b>公式REST API＋公式Python SDK</b>があることを確認。ブラウザ自動化に頼らず4段を完全自動化できる。音声・リップシンクもAPI/内蔵機能でカバー。→ リスクは「実装可否」から「運用コスト」に移った。
+</div>
+<div class="box risk">
+  <div class="bt">▲ 最大リスク: 動画尺に比例するコスト</div>
+  費用の9割超が動画生成で、尺にほぼ比例する。10分尺×月20本は<b>月$1,000〜1,600規模</b>に達しうる（第4章）。「1本を何秒にするか」「長尺は話すアバターで畳めるか」が事業採算を直接決める。<b>まずショート尺で単価と品質を検証し、採算が見えてから長尺へ、が安全。</b>
+</div>
+<ul>
+  <li><b>尺の制約:</b> 生成AI映像は1クリップ5〜8秒。長尺は複数クリップの結合前提で、シーン割り設計とクリップ数管理が要。</li>
+  <li><b>品質のばらつき:</b> 生成映像は当たり外れがあり、リトライ＝追加クレジット前提。歩留まり+20〜40%を見込む。</li>
+  <li><b>クレジット失効:</b> 月次クレジットは繰越なし、トップアップは約90日で失効。作る本数と契約プランを合わせないと無駄が出る。</li>
+  <li><b>API仕様の未確定点:</b> 音声/リップシンク機能がAPI経由で叩けるかはSDK文書で未確認。実装前に要検証（画像・動画生成は文書化済み）。</li>
+</ul>
+
+<h2><span class="no">06</span> 段階導入案</h2>
+<div class="phase"><div class="pn">1</div><div class="pc"><div class="pt">半自動MVP（Agent 1・2・4を自動化）</div><div class="pd">調査→企画→説明文までを自動化し、動画生成だけ手動（Higgsfield手打ち）。最小コストで「企画の質」を検証。</div></div></div>
+<div class="phase"><div class="pn">2</div><div class="pc"><div class="pt">動画生成の接続（Higgsfield公式SDK）</div><div class="pd">ショート尺で Agent 3 を接続し、1本あたりの実コストと生成品質・歩留まりを実測。API経由の音声/リップシンク可否もここで検証。</div></div></div>
+<div class="phase"><div class="pn">3</div><div class="pc"><div class="pt">全自動＋レビューゲート</div><div class="pd">4段を直列で自動実行。企画GOと最終納品前に⚔️指揮官レビュー（GO/差し戻し）を挟む運用に。採算が見えたら尺・本数をスケール。</div></div></div>
+
+<footer>AI動画コンテンツ製造ワークフロー 設計書 v1.0 ／ 価格は2026-07-09時点の調査値（Higgsfield公式ページはJSレンダリングのため一部は第三者記事に依拠、要実測検証）。外部提出前に⚔️指揮官レビュー推奨。</footer>
+</div>
