@@ -347,19 +347,6 @@ const IO={
 /* 特化型エージェントの複数連携（万能1体でなく、タスク特化を直列につなぐ）。=「スキル図」。 */
 const S=(agent,inp,out,build)=>({agent,in:inp,out,build:!!build});
 const WORKFLOWS=[
-  {id:"wf1",name:"AI動画コンテンツ 量産",grad:"linear-gradient(135deg,#5B4BE1,#8b7bf0)",
-   desc:"調査から説明文まで9体の特化エージェントを直列連携。動画を量産する製造ライン。",
-   steps:[
-     S("AI情報 調査","テーマ／期間","トレンド要約"),
-     S("動画企画","トレンド要約","企画書"),
-     S("台本作成","企画書","シーン台本"),
-     S("素材生成","台本","画像素材"),
-     S("素材×台本 紐付け","台本＋素材","ショットリスト"),
-     S("動画生成","ショットリスト（＋手動素材）","動画クリップ"),
-     S("動画編集","クリップ＋台本","完成動画"),
-     S("動画レビュー","完成動画＋台本","GO／差し戻し"),
-     S("説明文生成","完成動画＋企画","タイトル・説明文一式"),
-   ]},
   {id:"wf2",name:"新規リード獲得 → 受注フォロー",grad:"linear-gradient(135deg,#0EA5E9,#5B4BE1)",
    desc:"営業の前後工程を5体で連携。リスト作成から商談後のフォローまで自動化。",
    steps:[
@@ -428,27 +415,27 @@ function ago(min){if(min<1)return"たった今";if(min<60)return`${min}分前`;i
 const LEVELS=[
   {key:"beg",icon:"🌱",label:"初級",sub:"スキル・エージェントがわからない方へ",grad:"linear-gradient(135deg,#5B4BE1,#8b7bf0)",
    lessons:[
-     {id:"b1",type:"video",dur:"03:20",topic:"用語",title:"AIエージェントとは？",desc:"“業務を代わりに進めてくれるAIの部品”という考え方を、身近な例で解説します。学ぶのではなく「使う」感覚をつかみましょう。"},
-     {id:"b2",type:"video",dur:"02:45",topic:"用語",title:"スキルとエージェントの違い",desc:"よく混同される「スキル」と「エージェント」を整理。何がどう違い、どう呼び分けるかを図で示します。"},
-     {id:"b3",type:"image",topic:"使い方",title:"画面の見方（サイドバー・カード）",desc:"どこに何があるか。1枚の注釈付き画像で、業務カテゴリ・タスクカード・マイエージェントの位置を把握できます。"},
-     {id:"b4",type:"video",dur:"04:10",topic:"使い方",title:"エージェントを受け取る・使う",desc:"タスクを開く→受け取る→マイエージェントから起動、の流れを画面録画で実演します。"},
+     {id:"b1",type:"image",topic:"用語",title:"AIエージェントとは？",desc:"“業務を代わりに進めてくれるAIの部品”という考え方を、図とテキストで解説します。学ぶのではなく「使う」感覚をつかみましょう。"},
+     {id:"b2",type:"image",topic:"用語",title:"スキルとエージェントの違い",desc:"よく混同される「スキル」と「エージェント」を、1枚の図で整理します。"},
+     {id:"b3",type:"image",topic:"使い方",title:"画面の見方（サイドバー・カード）",desc:"どこに何があるか。注釈付き画像で、業務カテゴリ・タスクカード・マイエージェントの位置を把握できます。"},
+     {id:"b4",type:"image",topic:"使い方",title:"エージェントを受け取る・使う",desc:"タスクを開く→受け取る→マイエージェントから起動、の流れを図解と手順で説明します。"},
      {id:"b5",type:"image",topic:"用語",title:"「新鮮情報」とは？",desc:"毎日届く時事ニュースの位置づけを図解。なぜ“学習”ではなく“新鮮情報”なのかを説明します。"},
    ]},
   {key:"mid",icon:"⚙️",label:"中級",sub:"自分で設定しているが、不足している方へ",grad:"linear-gradient(135deg,#0EA5E9,#5B4BE1)",
    lessons:[
-     {id:"m1",type:"video",dur:"05:30",topic:"使い方",title:"複数エージェントの組み合わせ方",desc:"1業務＝複数エージェントで前後工程をつなぐ方法（例：リストアップ→提案書→フォロー）を実演します。"},
-     {id:"m2",type:"image",topic:"使い方",title:"業務の棚卸しシート",desc:"自分の業務をタスク辞書に照合して抜けを見つけるための、記入例つきシートを画像で配布します。"},
-     {id:"m3",type:"video",dur:"03:15",topic:"使い方",title:"作成リクエストの出し方",desc:"未整備タスクのエージェントを1日以内で作ってもらう、リクエストの書き方のコツを解説します。"},
-     {id:"m4",type:"video",dur:"04:00",topic:"使い方",title:"時事ニュースを業務に活かす",desc:"新鮮情報から使える手法を拾い、エージェントを差し替える運用の流れを見せます。"},
+     {id:"m1",type:"image",topic:"使い方",title:"複数エージェントの組み合わせ方",desc:"1業務＝複数エージェントで前後工程をつなぐ方法（例：リストアップ→提案書→フォロー）を図で示します。"},
+     {id:"m2",type:"image",topic:"使い方",title:"業務の棚卸しシート",desc:"自分の業務をタスク辞書に照合して抜けを見つけるための、記入例つきシートを配布します。"},
+     {id:"m3",type:"image",topic:"使い方",title:"作成リクエストの出し方",desc:"未整備タスクのエージェントを1日以内で作ってもらう、リクエストの書き方のコツを手順で解説します。"},
+     {id:"m4",type:"image",topic:"使い方",title:"時事ニュースを業務に活かす",desc:"新鮮情報から使える手法を拾い、エージェントを差し替える運用の流れを図で見せます。"},
      {id:"m5",type:"image",topic:"用語",title:"パーソナライズ設定の項目",desc:"業界・役割などの業務文脈をどう登録するか。設定項目の意味を注釈画像で解説します。"},
    ]},
   {key:"adv",icon:"💰",label:"上級",sub:"どうマネタイズしていくか",grad:"linear-gradient(135deg,#F59E0B,#d97706)",
    lessons:[
-     {id:"a1",type:"video",dur:"06:20",topic:"マネタイズ",title:"スキルで収益化する全体像",desc:"使えるエージェントをどうお金に変えるか。サービス化・商品化・継続課金の全体像を俯瞰します。"},
+     {id:"a1",type:"image",topic:"マネタイズ",title:"スキルで収益化する全体像",desc:"使えるエージェントをどうお金に変えるか。サービス化・商品化・継続課金の全体像を1枚の図で俯瞰します。"},
      {id:"a2",type:"image",topic:"マネタイズ",title:"サービス化のパッケージ例",desc:"業務代行・効率化サービスとして外販する際の、パッケージ構成と価格の型を図で示します。"},
-     {id:"a3",type:"video",dur:"04:45",topic:"マネタイズ",title:"成果物を商品にする",desc:"エージェントで作った提案書・レポート・動画などの成果物を、納品・販売する流れを解説します。"},
-     {id:"a4",type:"video",dur:"05:10",topic:"マネタイズ",title:"サブスク継続課金の作り方",desc:"新鮮情報＋エージェント使い放題の月額モデルを設計する考え方を説明します。"},
-     {id:"a5",type:"image",topic:"マネタイズ",title:"代理店・OEM展開の図",desc:"業界別にパッケージ化し、代理店・OEMで面を広げる展開図を画像で示します。"},
+     {id:"a3",type:"image",topic:"マネタイズ",title:"成果物を商品にする",desc:"エージェントで作った提案書・レポート等の成果物を、納品・販売する流れを手順で解説します。"},
+     {id:"a4",type:"image",topic:"マネタイズ",title:"サブスク継続課金の作り方",desc:"新鮮情報＋エージェント使い放題の月額モデルを設計する考え方を図で説明します。"},
+     {id:"a5",type:"image",topic:"マネタイズ",title:"代理店・OEM展開の図",desc:"業界別にパッケージ化し、代理店・OEMで面を広げる展開図を示します。"},
    ]},
 ];
 const findLesson=id=>{for(const L of LEVELS){const x=L.lessons.find(z=>z.id===id);if(x)return{L,les:x};}return null;};
@@ -706,7 +693,7 @@ function renderSetup(){
   const v=$("#view");v.innerHTML="";
   v.appendChild(el("div","crumb",`<b>セットアップ</b> / 使い方レクチャー`));
   const head=el("div","libhead");head.innerHTML=`<h1><span>🚀</span> セットアップ（使い方レクチャー）</h1>`;v.appendChild(head);
-  v.appendChild(el("p","libsub","用語の意味や使い方を、<b>動画と画像でレクチャー</b>する環境です。レベル別に、AIエージェントの基本から収益化までを学べます。"));
+  v.appendChild(el("p","libsub","用語の意味や使い方を、<b>図解とテキストでレクチャー</b>する環境です。レベル別に、AIエージェントの基本から収益化までを学べます。"));
   const lv=el("div","levels");
   LEVELS.forEach(L=>{const b=el("button","lvl"+(state.level===L.key?" on":""));
     b.innerHTML=`<div class="ln">${L.icon} レベル</div><div class="lt">${L.label}</div><div class="ld">${L.sub}</div>`;
