@@ -60,7 +60,15 @@
   .scard .scio{font-size:11px;color:var(--faint);margin-top:7px;padding-top:6px;border-top:1px dashed var(--line);line-height:1.7}
   .scard .scio b{color:var(--slate);font-weight:700}
 
+  .builder{background:linear-gradient(135deg,var(--teal-wash),#fff);border:1px solid #a9d5cf;border-radius:12px;padding:16px 18px 8px;margin:24px 0 0;box-shadow:var(--shadow)}
+  .builder .bh{font-weight:800;font-size:15px;display:flex;align-items:center;gap:9px;color:var(--teal);flex-wrap:wrap}
+  .builder .bh .ic{font-size:18px}
+  .builder .bd{font-size:12.5px;color:var(--muted);margin:7px 0 4px;line-height:1.6}
+  .builder .down{text-align:center;font-size:11px;font-weight:800;color:var(--teal);letter-spacing:.1em;margin-top:6px}
+
   .agent{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--teal);border-radius:10px;padding:18px 20px;margin-bottom:16px;box-shadow:var(--shadow)}
+  .agent.meta{border-left-color:var(--ink);background:linear-gradient(135deg,#eef0f3,#fff)}
+  .agent.meta .ab{background:#e5e8ee}
   .agent.nw{border-left-color:var(--amber)}
   .agent .ah{display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}
   .agent .ab{width:38px;height:38px;border-radius:10px;background:var(--teal-wash);display:grid;place-items:center;font-size:19px;flex-shrink:0}
@@ -106,9 +114,9 @@
 <header>
   <div class="kicker">Workflow Design · 設計書</div>
   <h1>AI動画コンテンツ 製造ワークフロー</h1>
-  <p class="lede">Web上のAI情報を調査し、企画→台本→素材生成→紐付け→動画生成→編集→説明文までを<b>8体のエージェント</b>で連結する、月20本規模の量産パイプライン。使用APIと概算コストを含む設計仕様。</p>
+  <p class="lede">Web上のAI情報を調査し、企画→台本→素材生成→紐付け→動画生成→編集→説明文までを<b>8体のエージェント</b>で連結する、月20本規模の量産パイプライン。さらに最上位に、この8体を自動で構築・保守する<b>ビルダーエージェント（メタ層）</b>を置く。使用APIと概算コストを含む設計仕様。</p>
   <div class="meta">
-    <span class="chip">エージェント: <b>8体</b></span>
+    <span class="chip">エージェント: <b>8体 ＋ ビルダー</b></span>
     <span class="chip">前提: <b>月20本以上</b></span>
     <span class="chip">動画: <b>Higgsfield AI（公式API）</b></span>
     <span class="chip">調査: <b>Tavily</b></span>
@@ -118,7 +126,13 @@
 </header>
 
 <h2><span class="no">01</span> 全体像</h2>
-<p class="sub">8エージェントを直列につなぎ、各段の出力が次段の入力になる。動画生成には、生成した素材に加えて<b>こちらから任意の素材・画像を渡せる</b>。人が挟まるのは「企画GO」と「最終レビュー」の2点。</p>
+<p class="sub">最上位のビルダーが下の8体を構築・保守し、実行層の8エージェントが直列で1本を作る。動画生成には、生成素材に加えて<b>こちらから任意の素材・画像を渡せる</b>。人が挟まるのは「企画GO」と「最終レビュー」の2点。</p>
+
+<div class="builder">
+  <div class="bh"><span class="ic">⚙️</span> メタ層 ── ビルダーエージェント（この8体を作る／動かせるようにするエージェント）</div>
+  <p class="bd">この設計書を入力に、下の8体を「動く実体」として自動生成・配線し、仕様変更時は再生成・更新まで担う。人は要件と承認のみ。</p>
+  <div class="down">↓ 生成・配線・保守</div>
+</div>
 
 <div class="rail">
   <div class="step"><div class="node">1</div><div class="scard"><div class="sct"><span class="ic">🔍</span> AI情報 調査</div><div class="scd">X/Web上の最新AIトレンド・話題を収集し、要点を構造化。</div><div class="scio"><b>出力</b> トレンド要約（トピック・要点・出典）</div></div></div>
@@ -137,7 +151,18 @@
 </div>
 
 <h2><span class="no">02</span> 各エージェント仕様</h2>
-<p class="sub">役割・入出力・使用API/モデル。モデルは難易度で出し分ける（企画/台本=高性能、紐付け/整形=低コスト）。<span style="color:var(--amber);font-weight:700">新規</span>の4体を含む8体。</p>
+<p class="sub">役割・入出力・使用API/モデル。モデルは難易度で出し分ける（企画/台本=高性能、紐付け/整形=低コスト）。最上位に<span style="color:var(--ink);font-weight:700">ビルダー（メタ層）</span>、その下に実行層の8体。</p>
+
+<div class="agent meta">
+  <div class="ah"><div class="ab">⚙️</div><div><div class="an">Agent ⚙ ── ビルダー（構築エージェント）<span class="badge nw" style="background:#e5e8ee;color:var(--ink)">メタ層</span></div><div class="ar">Pipeline Builder / Orchestrator-Constructor</div></div></div>
+  <dl>
+    <dt>役割</dt><dd>この設計書を入力に、Agent 1〜8の実体（各システムプロンプト・API連携コード・段間スキーマ・オーケストレーション・リトライ）を生成し、動く状態に組み上げる。仕様変更時は差分を再生成・更新。</dd>
+    <dt>入力</dt><dd>設計書（8体の定義・I/Oスキーマ・API割当）、資格情報（各APIキー）、変更要件</dd>
+    <dt>出力</dt><dd>実行可能なパイプライン一式（各エージェントのコード/プロンプト・実行スクリプト・設定・テスト）</dd>
+    <dt>API</dt><dd>Claude <code>claude-opus-4-8</code> によるエージェンティックなコード生成。実装基盤は <span class="api">Claude Agent SDK</span> または <span class="api">Managed Agents</span>（コードを書く→動かす→直すループ、bash・ファイル操作・検証を回す）</dd>
+    <dt>備考</dt><dd>いわゆる「エージェントを作るエージェント」。初期構築と仕様変更の反映を自動化。ビルド時のみ動くため<b>per-videoコストには乗らない</b>（第4章の注記）</dd>
+  </dl>
+</div>
 
 <div class="agent">
   <div class="ah"><div class="ab">🔍</div><div><div class="an">Agent 1 ── AI情報 調査</div><div class="ar">Research / Trend Scan</div></div></div>
@@ -266,6 +291,10 @@
   <div class="bt">◆ 結論は不変: コストは「動画の尺」でほぼ決まる</div>
   エージェントを4→8体に増やしても、追加分（台本・素材・紐付け・編集）は合計 約$0.9/本で誤差レベル。<b>費用の9割超はいまも動画生成</b>で、尺にほぼ比例する。設計判断は依然「1本を何秒にするか」が最重要。
 </div>
+<div class="box info">
+  <div class="bt">◆ ビルダー（メタ層）のコストは別枠・ビルド時のみ</div>
+  ビルダーは毎本走らせるものではなく、<b>初期構築と仕様変更のときだけ</b>動く。1回のビルド/大改修で Claude のエージェンティックコーディング（数百K〜数M tokens）＝<b>$数〜数十</b>程度。仕様変更が無い月は $0。したがって上のper-video試算には含めない。
+</div>
 
 <h3>4-2. 尺別シナリオ（月20本・Veo 3 Fast品質）</h3>
 <div class="tw">
@@ -308,5 +337,5 @@
 <div class="phase"><div class="pn">2</div><div class="pc"><div class="pt">素材と生成の接続（Agent 4〜6）</div><div class="pd">素材生成・紐付け・Higgsfield生成をショート尺で接続。手動素材の受け渡し口と、1本あたり実コスト・歩留まりを実測。</div></div></div>
 <div class="phase"><div class="pn">3</div><div class="pc"><div class="pt">編集の自動化＋全自動運用（Agent 7）</div><div class="pd">ffmpeg編集を接続し8段を直列で自動実行。企画GOと最終納品前に指揮官レビューを挟む運用に。採算が見えたら尺・本数をスケール。</div></div></div>
 
-<footer>AI動画コンテンツ製造ワークフロー 設計書 v2.0（8エージェント）／ 価格は2026-07-09時点の調査値（Higgsfield公式はJSレンダリングのため一部第三者記事に依拠、要実測検証）。外部提出前に⚔️指揮官レビュー推奨。</footer>
+<footer>AI動画コンテンツ製造ワークフロー 設計書 v3.0（8エージェント＋ビルダー）／ 価格は2026-07-09時点の調査値（Higgsfield公式はJSレンダリングのため一部第三者記事に依拠、要実測検証）。外部提出前に⚔️指揮官レビュー推奨。</footer>
 </div>
