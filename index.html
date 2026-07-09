@@ -1,0 +1,885 @@
+<title>AI ACADEMY — eラーニング プロトタイプ</title>
+<style>
+  :root{
+    --canvas:#F7F8FB;
+    --surface:#FFFFFF;
+    --ink:#141A2E;
+    --muted:#5A617A;
+    --faint:#8A90A6;
+    --line:#E4E7F0;
+    --line-strong:#D3D8E6;
+    --accent:#5B4BE1;
+    --accent-ink:#3E30B8;
+    --accent-wash:#EEECFB;
+    --coral:#FF6B4A;
+    --coral-wash:#FFEDE7;
+    --green:#12B76A;
+    --green-wash:#E4F7EE;
+    --shadow:0 1px 2px rgba(20,26,46,.06),0 8px 24px rgba(20,26,46,.06);
+    --shadow-lg:0 12px 40px rgba(20,26,46,.16);
+    --r:14px;
+    --font:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",Meiryo,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:var(--font);
+    color:var(--ink);
+    background:var(--canvas);
+    -webkit-font-smoothing:antialiased;
+    line-height:1.6;
+  }
+  button{font-family:inherit;cursor:pointer}
+  .tnum{font-variant-numeric:tabular-nums}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+
+  /* ---------- LOGIN ---------- */
+  #login{
+    min-height:100vh;display:grid;grid-template-columns:1.1fr .9fr;
+  }
+  #login .brandpane{
+    background:
+      radial-gradient(120% 90% at 15% 10%,rgba(255,107,74,.28),transparent 55%),
+      radial-gradient(120% 120% at 90% 90%,rgba(91,75,225,.55),transparent 60%),
+      linear-gradient(150deg,#221C4E,#141A2E 70%);
+    color:#fff;padding:64px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden;
+  }
+  #login .brandmark{display:flex;align-items:center;gap:12px;font-weight:800;letter-spacing:.14em;font-size:15px}
+  #login .brandmark .dot{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--coral),var(--accent));display:grid;place-items:center;font-size:16px;box-shadow:0 4px 14px rgba(91,75,225,.5)}
+  #login .pitch h1{font-size:clamp(30px,4vw,46px);line-height:1.18;margin:0 0 18px;font-weight:800;text-wrap:balance;letter-spacing:-.01em}
+  #login .pitch p{font-size:16px;color:rgba(255,255,255,.78);max-width:42ch;margin:0}
+  #login .stats{display:flex;gap:34px;margin-top:30px}
+  #login .stats div span{display:block}
+  #login .stats .n{font-size:26px;font-weight:800}
+  #login .stats .l{font-size:12px;color:rgba(255,255,255,.62);letter-spacing:.04em}
+  #login .foot{font-size:12px;color:rgba(255,255,255,.5)}
+
+  #login .formpane{display:grid;place-items:center;padding:40px}
+  #login form{width:100%;max-width:360px}
+  #login form h2{font-size:23px;margin:0 0 6px;font-weight:800}
+  #login form .sub{color:var(--muted);font-size:14px;margin:0 0 28px}
+  #login label{display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin:0 0 7px;letter-spacing:.02em}
+  #login .field{margin-bottom:18px}
+  #login input{
+    width:100%;padding:12px 14px;border:1px solid var(--line-strong);border-radius:10px;
+    font-size:15px;color:var(--ink);background:#fff;transition:border-color .15s,box-shadow .15s;
+  }
+  #login input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-wash)}
+  #login .row{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;margin-bottom:24px}
+  #login .row a{color:var(--accent-ink);text-decoration:none;font-weight:600}
+  #login .row label{margin:0;display:flex;gap:7px;align-items:center;color:var(--muted);font-weight:500;text-transform:none}
+  #login button.primary{
+    width:100%;padding:13px;border:none;border-radius:10px;background:var(--accent);color:#fff;
+    font-size:15px;font-weight:700;transition:background .15s,transform .05s;box-shadow:0 6px 18px rgba(91,75,225,.32)
+  }
+  #login button.primary:hover{background:var(--accent-ink)}
+  #login button.primary:active{transform:translateY(1px)}
+  #login .hint{margin-top:18px;font-size:12px;color:var(--faint);text-align:center;background:var(--accent-wash);padding:9px;border-radius:8px}
+
+  /* ---------- APP SHELL ---------- */
+  #app{display:none}
+  #app.on{display:block}
+  .topbar{
+    position:sticky;top:0;z-index:40;height:60px;background:var(--surface);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:20px;padding:0 22px;
+  }
+  .topbar .logo{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.12em;font-size:14px}
+  .topbar .logo .dot{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--coral),var(--accent));display:grid;place-items:center;font-size:14px}
+  .seg{display:flex;background:var(--canvas);border:1px solid var(--line);border-radius:9px;padding:3px;gap:2px}
+  .seg button{border:none;background:transparent;padding:6px 16px;border-radius:6px;font-size:13px;font-weight:600;color:var(--muted)}
+  .seg button.active{background:var(--accent);color:#fff}
+  .topbar .spacer{flex:1}
+  .icobtn{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:#fff;display:grid;place-items:center;font-size:16px;color:var(--muted);position:relative}
+  .icobtn .badge{position:absolute;top:-4px;right:-4px;background:var(--coral);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:grid;place-items:center;padding:0 4px}
+  .avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#5B4BE1,#8b7bf0);color:#fff;display:grid;place-items:center;font-weight:700;font-size:14px}
+
+  .layout{display:grid;grid-template-columns:236px 1fr;align-items:start}
+  .side{position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto;border-right:1px solid var(--line);background:var(--surface);padding:18px 12px}
+  .side .grp{margin-bottom:6px}
+  .side .grp>.ttl{font-size:11px;font-weight:700;color:var(--faint);letter-spacing:.08em;padding:14px 12px 6px;text-transform:uppercase}
+  .navitem{
+    display:flex;align-items:center;gap:11px;width:100%;border:none;background:transparent;text-align:left;
+    padding:9px 12px;border-radius:9px;font-size:13.5px;color:var(--ink);font-weight:500;position:relative
+  }
+  .navitem .ic{width:20px;text-align:center;font-size:15px;flex-shrink:0}
+  .navitem .ct{margin-left:auto;font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
+  .navitem:hover{background:var(--canvas)}
+  .navitem.active{background:var(--accent-wash);color:var(--accent-ink);font-weight:700}
+  .navitem .newtag{margin-left:auto;background:var(--coral);color:#fff;font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;letter-spacing:.05em}
+
+  .main{padding:26px 30px 60px;min-width:0}
+  .crumb{font-size:12.5px;color:var(--faint);margin-bottom:16px}
+  .crumb b{color:var(--muted);font-weight:600}
+
+  .libhead{display:flex;align-items:center;gap:14px;margin-bottom:22px;flex-wrap:wrap}
+  .libhead h1{font-size:21px;margin:0;font-weight:800;letter-spacing:-.01em;display:flex;align-items:center;gap:9px}
+  .libhead .count{font-size:12.5px;color:var(--muted);font-weight:600;background:var(--canvas);border:1px solid var(--line);padding:3px 10px;border-radius:20px}
+  .libhead .spacer{flex:1}
+  .search{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line-strong);border-radius:10px;padding:8px 12px;min-width:230px}
+  .search input{border:none;outline:none;font-size:14px;width:100%;background:transparent;color:var(--ink)}
+  .search .ic{color:var(--faint)}
+  .viewtog{display:flex;border:1px solid var(--line-strong);border-radius:9px;overflow:hidden}
+  .viewtog button{border:none;background:#fff;width:38px;height:37px;font-size:15px;color:var(--muted);display:grid;place-items:center}
+  .viewtog button.active{background:var(--accent);color:#fff}
+
+  .contentgrid{display:grid;grid-template-columns:1fr 300px;gap:26px;align-items:start}
+  @media(max-width:1100px){.contentgrid{grid-template-columns:1fr}.aside{display:none}}
+
+  /* course grid */
+  .courses.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:20px}
+  .card{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;
+    box-shadow:var(--shadow);transition:transform .16s,box-shadow .16s,border-color .16s;text-align:left;width:100%;padding:0;display:flex;flex-direction:column
+  }
+  .card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg);border-color:var(--line-strong)}
+  .thumb{aspect-ratio:16/9;position:relative;display:grid;place-items:center;color:#fff}
+  .thumb .glyph{font-size:34px;filter:drop-shadow(0 4px 10px rgba(0,0,0,.25))}
+  .thumb .len{position:absolute;right:8px;bottom:8px;background:rgba(20,26,46,.82);color:#fff;font-size:11px;font-weight:600;padding:2px 7px;border-radius:6px;font-variant-numeric:tabular-nums}
+  .thumb .cat{position:absolute;left:8px;top:8px;background:rgba(255,255,255,.92);color:var(--ink);font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;letter-spacing:.02em}
+  .card .body{padding:13px 14px 15px;display:flex;flex-direction:column;gap:9px;flex:1}
+  .card .title{font-size:14.5px;font-weight:700;line-height:1.4;letter-spacing:-.01em}
+  .card .meta{font-size:11.5px;color:var(--faint);display:flex;gap:10px;margin-top:-3px}
+  .prog{margin-top:auto}
+  .prog .bar{height:6px;background:var(--line);border-radius:4px;overflow:hidden}
+  .prog .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#8b7bf0);border-radius:4px;transition:width .3s}
+  .prog .bar i.done{background:var(--green)}
+  .prog .lbl{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:5px;font-weight:600}
+  .prog .lbl .pct{font-variant-numeric:tabular-nums}
+
+  /* course list view */
+  .courses.list{display:flex;flex-direction:column;gap:12px}
+  .courses.list .card{flex-direction:row;align-items:stretch}
+  .courses.list .thumb{width:200px;aspect-ratio:16/9;flex-shrink:0}
+  .courses.list .body{flex:1}
+  .courses.list .card .meta{margin-top:0}
+  @media(max-width:640px){.courses.list .thumb{width:130px}}
+
+  /* aside */
+  .aside{display:flex;flex-direction:column;gap:16px}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;box-shadow:var(--shadow)}
+  .panel h3{font-size:13.5px;margin:0 0 12px;font-weight:800;display:flex;align-items:center;gap:8px}
+  .notice{font-size:13px;color:var(--muted);padding:10px 0;border-bottom:1px solid var(--line);display:flex;gap:10px}
+  .notice:last-child{border-bottom:none;padding-bottom:0}
+  .notice .tag{font-size:10px;font-weight:700;color:var(--coral);background:var(--coral-wash);padding:2px 6px;border-radius:5px;height:fit-content;white-space:nowrap}
+  .miniprog{display:flex;flex-direction:column;gap:12px}
+  .miniprog .row{display:flex;align-items:center;gap:10px;font-size:12.5px}
+  .miniprog .ring{width:40px;height:40px;flex-shrink:0}
+  .miniprog .t{font-weight:600;line-height:1.3}
+  .miniprog .s{color:var(--faint);font-size:11px}
+
+  /* ---------- COURSE DETAIL ---------- */
+  .detail{max-width:1080px;margin:0 auto}
+  .backbtn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line-strong);background:#fff;border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:18px}
+  .backbtn:hover{background:var(--canvas)}
+  .player{background:#0d1120;border-radius:16px;overflow:hidden;box-shadow:var(--shadow-lg)}
+  .player .screen{aspect-ratio:16/9;position:relative;display:grid;place-items:center;background:radial-gradient(80% 80% at 50% 35%,#22284a,#0d1120)}
+  .player .playbtn{width:74px;height:74px;border-radius:50%;background:rgba(255,255,255,.14);backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,.25);display:grid;place-items:center;color:#fff;font-size:26px;transition:transform .15s,background .15s}
+  .player .playbtn:hover{transform:scale(1.06);background:rgba(91,75,225,.55)}
+  .player .nowtag{position:absolute;left:16px;top:14px;font-size:11px;color:rgba(255,255,255,.6);font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+  .player .placeholder{position:absolute;bottom:14px;left:16px;right:16px;font-size:11.5px;color:rgba(255,255,255,.4)}
+  .player .ctrl{display:flex;align-items:center;gap:14px;padding:12px 16px;color:#fff}
+  .player .ctrl .now{font-size:13.5px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .player .ctrl .len{font-size:12px;color:rgba(255,255,255,.55);font-variant-numeric:tabular-nums}
+  .player .ctrl .mk{border:1px solid rgba(255,255,255,.28);background:transparent;color:#fff;font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px}
+  .player .ctrl .mk.done{background:var(--green);border-color:var(--green)}
+
+  .dhead{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:end;margin:24px 0 20px}
+  .dhead h1{font-size:24px;margin:0 0 8px;font-weight:800;letter-spacing:-.01em;text-wrap:balance}
+  .dhead .dmeta{display:flex;gap:16px;font-size:13px;color:var(--muted);flex-wrap:wrap}
+  .dhead .dmeta b{color:var(--ink)}
+  .dhead .big{text-align:right}
+  .dhead .big .pct{font-size:34px;font-weight:800;color:var(--accent-ink);font-variant-numeric:tabular-nums;line-height:1}
+  .dhead .big .cap{font-size:11px;color:var(--faint);font-weight:600}
+  .dbar{height:8px;background:var(--line);border-radius:5px;overflow:hidden;margin-bottom:28px}
+  .dbar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#8b7bf0);border-radius:5px;transition:width .3s}
+
+  .section{border:1px solid var(--line);border-radius:12px;margin-bottom:12px;overflow:hidden;background:var(--surface)}
+  .section>.sh{display:flex;align-items:center;gap:12px;padding:14px 16px;width:100%;border:none;background:#fff;text-align:left}
+  .section>.sh:hover{background:var(--canvas)}
+  .section .snum{font-size:11px;font-weight:800;color:var(--accent-ink);background:var(--accent-wash);padding:3px 9px;border-radius:6px;letter-spacing:.04em;white-space:nowrap}
+  .section .stitle{font-weight:700;font-size:14.5px;flex:1}
+  .section .scount{font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
+  .section .chev{color:var(--faint);transition:transform .2s;font-size:13px}
+  .section.open .chev{transform:rotate(90deg)}
+  .lessons{display:none;border-top:1px solid var(--line)}
+  .section.open .lessons{display:block}
+  .lesson{display:flex;align-items:center;gap:13px;padding:12px 16px;border-bottom:1px solid var(--line);width:100%;border-left:none;border-right:none;border-top:none;background:transparent;text-align:left}
+  .lesson:last-child{border-bottom:none}
+  .lesson:hover{background:var(--accent-wash)}
+  .lesson.playing{background:var(--accent-wash)}
+  .lesson .check{width:22px;height:22px;border-radius:50%;border:2px solid var(--line-strong);flex-shrink:0;display:grid;place-items:center;font-size:12px;color:transparent}
+  .lesson.done .check{background:var(--green);border-color:var(--green);color:#fff}
+  .lesson .lt{flex:1;font-size:14px;font-weight:500}
+  .lesson.playing .lt{color:var(--accent-ink);font-weight:700}
+  .lesson .ll{font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:6px}
+
+  .empty{text-align:center;padding:70px 20px;color:var(--faint)}
+  .empty .big{font-size:40px;margin-bottom:12px}
+  .hidden{display:none!important}
+
+  /* ---------- AGENTS / SKILLS ---------- */
+  .sectlbl{font-size:13px;font-weight:800;letter-spacing:.02em;margin:0 0 14px;display:flex;align-items:center;gap:9px;color:var(--ink)}
+  .sectlbl .pill{font-size:11px;font-weight:700;color:var(--accent-ink);background:var(--accent-wash);padding:2px 9px;border-radius:20px;font-variant-numeric:tabular-nums}
+  .agentgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:34px}
+  .agentcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px;transition:border-color .16s,box-shadow .16s}
+  .agentcard:hover{border-color:var(--line-strong);box-shadow:var(--shadow-lg)}
+  .agentcard .top{display:flex;gap:12px;align-items:flex-start}
+  .agentcard .ico{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:21px;color:#fff;flex-shrink:0}
+  .agentcard .nm{font-size:15px;font-weight:800;line-height:1.3}
+  .agentcard .tg{font-size:12px;color:var(--accent-ink);font-weight:600;margin-top:2px}
+  .agentcard .desc{font-size:12.5px;color:var(--muted);line-height:1.55;flex:1}
+  .agentcard .link{font-size:11.5px;color:var(--faint);display:flex;align-items:center;gap:6px}
+  .agentcard .acts{display:flex;gap:8px}
+  .btn{border:none;border-radius:9px;font-size:13px;font-weight:700;padding:9px 14px;transition:background .15s,transform .05s,border-color .15s}
+  .btn:active{transform:translateY(1px)}
+  .btn.claim{background:var(--accent);color:#fff;flex:1;box-shadow:0 4px 12px rgba(91,75,225,.28)}
+  .btn.claim:hover{background:var(--accent-ink)}
+  .btn.owned{background:var(--green-wash);color:var(--green);border:1px solid #b9ecd2;flex:1;cursor:default}
+  .btn.ghost{background:#fff;border:1px solid var(--line-strong);color:var(--muted)}
+  .btn.ghost:hover{background:var(--canvas)}
+  .btn.use{background:var(--ink);color:#fff;flex:1}
+  .btn.use:hover{background:#0a0f1e}
+  .ownedmark{margin-left:auto;font-size:10.5px;font-weight:800;color:var(--green);background:var(--green-wash);padding:3px 9px;border-radius:20px;height:fit-content}
+
+  /* bundled agents inside course detail */
+  .bundle{background:linear-gradient(135deg,var(--accent-wash),#fff);border:1px solid var(--line-strong);border-radius:14px;padding:18px;margin:0 0 28px}
+  .bundle .bh{font-size:14px;font-weight:800;margin:0 0 4px;display:flex;align-items:center;gap:8px}
+  .bundle .bs{font-size:12.5px;color:var(--muted);margin:0 0 14px}
+  .bundle .brow{display:flex;align-items:center;gap:13px;background:#fff;border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin-bottom:10px}
+  .bundle .brow:last-child{margin-bottom:0}
+  .bundle .brow .ico{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;font-size:18px;color:#fff;flex-shrink:0}
+  .bundle .brow .info{flex:1;min-width:0}
+  .bundle .brow .info .nm{font-size:13.5px;font-weight:700}
+  .bundle .brow .info .tg{font-size:11.5px;color:var(--muted)}
+
+  /* toast */
+  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:13px 20px;border-radius:12px;font-size:13.5px;font-weight:600;box-shadow:var(--shadow-lg);z-index:200;opacity:0;transition:opacity .25s,transform .25s;display:flex;align-items:center;gap:10px;max-width:90vw}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast .em{font-size:18px}
+
+  /* modal */
+  .overlay{position:fixed;inset:0;background:rgba(20,26,46,.5);backdrop-filter:blur(3px);z-index:150;display:grid;place-items:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .2s}
+  .overlay.show{opacity:1;pointer-events:auto}
+  .modal{background:#fff;border-radius:18px;padding:26px;width:100%;max-width:400px;box-shadow:var(--shadow-lg);transform:scale(.96);transition:transform .2s}
+  .overlay.show .modal{transform:scale(1)}
+  .modal .mtop{display:flex;gap:13px;align-items:center;margin-bottom:6px}
+  .modal .mtop .ico{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;font-size:20px;color:#fff;flex-shrink:0}
+  .modal h3{font-size:17px;margin:0;font-weight:800}
+  .modal .msub{font-size:13px;color:var(--muted);margin:2px 0 20px}
+  .modal label{display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin:0 0 7px}
+  .modal input{width:100%;padding:11px 13px;border:1px solid var(--line-strong);border-radius:10px;font-size:14px;margin-bottom:8px}
+  .modal input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-wash)}
+  .modal .warn{font-size:11.5px;color:var(--faint);margin:0 0 18px;line-height:1.5}
+  .modal .macts{display:flex;gap:10px}
+  .modal .macts .btn{flex:1;padding:11px}
+  @media(max-width:760px){
+    .layout{grid-template-columns:1fr}
+    .side{display:none}
+    .main{padding:18px}
+  }
+</style>
+
+<!-- ===================== LOGIN ===================== -->
+<div id="login">
+  <div class="brandpane">
+    <div class="brandmark"><span class="dot">◆</span> AI ACADEMY</div>
+    <div class="pitch">
+      <h1>現場で使えるAIスキルを、<br>動画で最短習得。</h1>
+      <p>生成AIの基礎から実務活用まで。体系化されたカリキュラムを、いつでもどこでも、あなたのペースで。</p>
+      <div class="stats">
+        <div><span class="n tnum">120+</span><span class="l">レッスン動画</span></div>
+        <div><span class="n tnum">8</span><span class="l">コース</span></div>
+        <div><span class="n tnum">24h</span><span class="l">いつでも受講</span></div>
+      </div>
+    </div>
+    <div class="foot">プロトタイプ / データはイメージです</div>
+  </div>
+  <div class="formpane">
+    <form id="loginForm">
+      <h2>ログイン</h2>
+      <p class="sub">受講者アカウントでサインインしてください。</p>
+      <div class="field">
+        <label for="em">メールアドレス</label>
+        <input id="em" type="email" placeholder="you@example.com" value="member@ai-academy.jp" autocomplete="username">
+      </div>
+      <div class="field">
+        <label for="pw">パスワード</label>
+        <input id="pw" type="password" placeholder="••••••••" value="demo1234" autocomplete="current-password">
+      </div>
+      <div class="row">
+        <label><input type="checkbox" checked> ログイン状態を保持</label>
+        <a href="#" onclick="return false">パスワードを忘れた方</a>
+      </div>
+      <button class="primary" type="submit">ログイン</button>
+      <div class="hint">プロトタイプ: そのまま「ログイン」で入れます</div>
+    </form>
+  </div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<div id="app">
+  <div class="topbar">
+    <div class="logo"><span class="dot">◆</span> AI ACADEMY</div>
+    <div class="seg">
+      <button class="active">ユーザー</button>
+      <button title="プロトタイプでは未実装">管理</button>
+    </div>
+    <div class="spacer"></div>
+    <button class="icobtn" title="メッセージ">✉</button>
+    <button class="icobtn" title="お知らせ">🔔<span class="badge">2</span></button>
+    <div class="avatar" id="avatar">AA</div>
+    <button class="icobtn" id="logout" title="ログアウト">⏻</button>
+  </div>
+
+  <div class="layout">
+    <nav class="side" id="side"></nav>
+    <main class="main" id="view"></main>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   DATA — 差し替えポイント。ここを自社スクールのコースに書き換えるだけで
+   ライブラリ全体が更新されます。SHIFT AI のUIを参考にしたイメージデータ。
+   ===================================================================== */
+const CATEGORIES = [
+  {id:"all",   label:"すべて表示",     icon:"▦"},
+  {id:"basic", label:"生成AI基礎",     icon:"◐"},
+  {id:"prac",  label:"実践・活用",     icon:"◆"},
+  {id:"tool",  label:"ツール別",       icon:"⚙"},
+  {id:"job",   label:"職種別",         icon:"⬡"},
+  {id:"seminar",label:"セミナー",      icon:"◈", isNew:true},
+  {id:"internal",label:"社内限定",     icon:"🔒"},
+];
+
+const COURSES = [
+  {
+    id:"c1", title:"シン・生成AI基礎コース", cat:"basic",
+    glyph:"◐", grad:"linear-gradient(135deg,#5B4BE1,#8b7bf0)",
+    sections:[
+      {title:"オリエンテーション", lessons:[
+        {t:"シン・生成AI基礎コース オリエンテーション", d:"06:20"},
+        {t:"このコースの学び方と進め方", d:"04:10"},
+      ]},
+      {title:"生成AI入門", lessons:[
+        {t:"「生成AI入門」導入", d:"08:45"},
+        {t:"生成AIとは何か", d:"12:30"},
+        {t:"生成AIの歩み", d:"10:15"},
+        {t:"生成AIの進化（画像・音声・動画）", d:"14:50"},
+      ]},
+      {title:"仕組みを理解する", lessons:[
+        {t:"大規模言語モデルの基本", d:"16:05"},
+        {t:"トークンとコンテキストウィンドウ", d:"11:20"},
+        {t:"ハルシネーションと限界", d:"09:40"},
+      ]},
+    ]
+  },
+  {
+    id:"c2", title:"生成AI実践コース", cat:"prac",
+    glyph:"◆", grad:"linear-gradient(135deg,#FF6B4A,#c0392b)",
+    sections:[
+      {title:"広用機能活用実践", lessons:[
+        {t:"「応用機能活用実践」オリエンテーション", d:"05:30"},
+        {t:"検索機能について", d:"10:10"},
+        {t:"web検索におけるプロンプトのコツ", d:"13:25"},
+        {t:"web検索ワーク", d:"08:00"},
+        {t:"DeepResearchワーク", d:"15:40"},
+      ]},
+      {title:"業務への組み込み", lessons:[
+        {t:"議事録の自動化", d:"12:15"},
+        {t:"メール・提案文の下書き生成", d:"11:05"},
+        {t:"表計算・データ整形の自動化", d:"14:20"},
+      ]},
+    ]
+  },
+  {
+    id:"c3", title:"クリエイティブコース", cat:"tool",
+    glyph:"✦", grad:"linear-gradient(135deg,#0EA5E9,#5B4BE1)",
+    sections:[
+      {title:"セクション概要・講師紹介", lessons:[
+        {t:"セクション概要・講師紹介", d:"04:50"},
+      ]},
+      {title:"Midjourney", lessons:[
+        {t:"Midjourneyとは", d:"09:15"},
+        {t:"Midjourneyの導入と初期設定", d:"12:40"},
+        {t:"Midjourneyの基本操作・コマンド", d:"16:30"},
+        {t:"さまざまなタイプの画像を生成してみる", d:"18:05"},
+      ]},
+      {title:"動画生成", lessons:[
+        {t:"動画生成AIの全体像", d:"11:00"},
+        {t:"ショート動画を作ってみる", d:"20:10"},
+      ]},
+    ]
+  },
+  {
+    id:"c4", title:"AIエージェント構築コース", cat:"prac",
+    glyph:"⬢", grad:"linear-gradient(135deg,#12B76A,#0d8a52)",
+    sections:[
+      {title:"オリエンテーション", lessons:[
+        {t:"エージェントとは何か", d:"07:30"},
+        {t:"5-2 プロンプトエンジニアリングの基本原則", d:"13:15"},
+      ]},
+      {title:"実践演習", lessons:[
+        {t:"ワーク: Notion MCP 連携", d:"17:20"},
+        {t:"ワーク: 自動化フローを組む", d:"19:45"},
+        {t:"実践演習", d:"22:00"},
+      ]},
+    ]
+  },
+  {
+    id:"c5", title:"職種別：営業のためのAI活用", cat:"job",
+    glyph:"⬡", grad:"linear-gradient(135deg,#F59E0B,#d97706)",
+    sections:[
+      {title:"オリエンテーション", lessons:[
+        {t:"営業×AIの全体像", d:"08:20"},
+      ]},
+      {title:"リード獲得と商談準備", lessons:[
+        {t:"リストアップの自動化", d:"14:10"},
+        {t:"商談ロールプレイをAIと行う", d:"16:35"},
+        {t:"提案書ドラフトの生成", d:"12:50"},
+      ]},
+    ]
+  },
+  {
+    id:"c6", title:"職種別：バックオフィスAI効率化", cat:"job",
+    glyph:"⬡", grad:"linear-gradient(135deg,#8B5CF6,#6d28d9)",
+    sections:[
+      {title:"経理・総務の自動化", lessons:[
+        {t:"請求書・経費処理の効率化", d:"13:40"},
+        {t:"問い合わせ対応テンプレの生成", d:"10:25"},
+      ]},
+    ]
+  },
+  {
+    id:"c7", title:"【NEW】最新モデル活用セミナー 2026", cat:"seminar",
+    glyph:"◈", grad:"linear-gradient(135deg,#EC4899,#5B4BE1)",
+    sections:[
+      {title:"セミナー本編", lessons:[
+        {t:"2026年 生成AIの最新動向", d:"28:30"},
+        {t:"新モデルのデモと実務インパクト", d:"31:15"},
+        {t:"Q&A / 質疑応答", d:"18:40"},
+      ]},
+    ]
+  },
+  {
+    id:"c8", title:"社内限定：オンボーディング研修", cat:"internal",
+    glyph:"🔒", grad:"linear-gradient(135deg,#334155,#141A2E)",
+    sections:[
+      {title:"はじめに", lessons:[
+        {t:"受講の心構えと環境設定", d:"06:00"},
+        {t:"社内AI利用ガイドラインの確認", d:"09:20"},
+      ]},
+    ]
+  },
+];
+
+/* =====================================================================
+   AGENTS / SKILLS — その場で「譲渡（受け取り）」できるエージェント。
+   コース側の agents:[...] で紐づけると、コース詳細にも受け取りブロックが出ます。
+   ===================================================================== */
+const AGENTS = [
+  {id:"a1", name:"議事録エージェント", icon:"📝", grad:"linear-gradient(135deg,#5B4BE1,#8b7bf0)",
+   tag:"会議 → 議事録 & タスク", course:"c2",
+   desc:"会議の音声やメモを渡すと、要約・決定事項・担当者付きのタスクを自動で書き出します。"},
+  {id:"a2", name:"リストアップ・スキル", icon:"🎯", grad:"linear-gradient(135deg,#FF6B4A,#c0392b)",
+   tag:"検索結果 → 見込み客リスト", course:"c5",
+   desc:"検索結果から見込み客を抽出し、既存台帳と照合して重複・営業済みを除いた新規リードだけを整理します。"},
+  {id:"a3", name:"提案書ドラフト生成", icon:"📄", grad:"linear-gradient(135deg,#0EA5E9,#5B4BE1)",
+   tag:"ヒアリングメモ → 提案書", course:"c5",
+   desc:"ヒアリング内容を入力すると、課題・打ち手・見積の骨子まで入った提案書の下書きを生成します。"},
+  {id:"a4", name:"画像プロンプト・メーカー", icon:"🎨", grad:"linear-gradient(135deg,#EC4899,#5B4BE1)",
+   tag:"イメージ → 生成プロンプト", course:"c3",
+   desc:"作りたい画像のイメージを伝えると、Midjourney向けの精度の高いプロンプトを設計します。"},
+  {id:"a5", name:"業務自動化フロー設計", icon:"⚙️", grad:"linear-gradient(135deg,#12B76A,#0d8a52)",
+   tag:"やりたいこと → 自動化設計", course:"c4",
+   desc:"「この作業を自動化したい」を渡すと、Notion/MCP連携を含む自動化フローの構成案を出します。"},
+  {id:"a6", name:"メール返信ドラフト", icon:"✉️", grad:"linear-gradient(135deg,#F59E0B,#d97706)",
+   tag:"受信メール → 返信案", course:"c2",
+   desc:"受け取ったメールを貼るだけで、トーンを合わせた返信ドラフトを複数パターン用意します。"},
+];
+const agentById=id=>AGENTS.find(a=>a.id===id);
+const courseAgents=c=>AGENTS.filter(a=>a.course===c.id);
+
+/* owned agents (localStorage) */
+const OKEY="ai-academy-agents-v1";
+let owned=new Set(JSON.parse(localStorage.getItem(OKEY)||"[]"));
+function saveOwned(){localStorage.setItem(OKEY,JSON.stringify([...owned]));}
+function grantAgent(id){owned.add(id);saveOwned();}
+function releaseAgent(id){owned.delete(id);saveOwned();}
+
+/* ---------- helpers ---------- */
+const $=(s,r=document)=>r.querySelector(s);
+const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
+const PKEY="ai-academy-progress-v1";
+let progress=JSON.parse(localStorage.getItem(PKEY)||"{}"); // {lessonKey:true}
+const lkey=(cid,si,li)=>`${cid}.${si}.${li}`;
+
+function toSec(mmss){const p=mmss.split(":").map(Number);return p.length===3?p[0]*3600+p[1]*60+p[2]:p[0]*60+p[1];}
+function fmtLong(sec){const h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),s=sec%60;const z=n=>String(n).padStart(2,"0");return `${z(h)}:${z(m)}:${z(s)}`;}
+function courseStats(c){
+  let total=0,done=0,secs=0;
+  c.sections.forEach((s,si)=>s.lessons.forEach((l,li)=>{total++;secs+=toSec(l.d);if(progress[lkey(c.id,si,li)])done++;}));
+  return {total,done,secs,pct:total?Math.round(done/total*100):0,len:fmtLong(secs)};
+}
+function saveProgress(){localStorage.setItem(PKEY,JSON.stringify(progress));}
+
+/* ---------- toast ---------- */
+let toastTimer;
+function toast(msg,emoji="✓"){
+  let t=$("#toast");
+  if(!t){t=el("div","toast");t.id="toast";document.body.appendChild(t);}
+  t.innerHTML=`<span class="em">${emoji}</span><span>${msg}</span>`;
+  requestAnimationFrame(()=>t.classList.add("show"));
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove("show"),2800);
+}
+
+/* ---------- transfer modal ---------- */
+function openTransfer(agent){
+  let ov=$("#overlay");
+  if(!ov){ov=el("div","overlay");ov.id="overlay";document.body.appendChild(ov);}
+  ov.innerHTML=`
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="mtop"><div class="ico" style="background:${agent.grad}">${agent.icon}</div>
+        <div><h3>エージェントを譲渡</h3></div></div>
+      <p class="msub">「${agent.name}」を、その場で他の受講者に譲渡します。</p>
+      <label for="rcp">譲渡先のメールアドレス</label>
+      <input id="rcp" type="email" placeholder="member@example.com" value="">
+      <p class="warn">譲渡すると、このエージェントはあなたの「マイエージェント」から外れ、相手のアカウントに移ります。</p>
+      <div class="macts">
+        <button class="btn ghost" id="tcancel">キャンセル</button>
+        <button class="btn claim" id="tsend">譲渡する</button>
+      </div>
+    </div>`;
+  requestAnimationFrame(()=>ov.classList.add("show"));
+  const close=()=>ov.classList.remove("show");
+  ov.onclick=e=>{if(e.target===ov)close();};
+  $("#tcancel").onclick=close;
+  $("#tsend").onclick=()=>{
+    const to=$("#rcp").value.trim()||"相手";
+    releaseAgent(agent.id);
+    close();
+    toast(`「${agent.name}」を ${to} へ譲渡しました`,"📤");
+    renderAll();
+  };
+  setTimeout(()=>{const i=$("#rcp");if(i)i.focus();},60);
+}
+
+/* ---------- state ---------- */
+let state={cat:"all", view:"grid", q:"", route:"library", courseId:null};
+
+/* ---------- LOGIN ---------- */
+$("#loginForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  const em=$("#em").value.trim()||"member";
+  $("#avatar").textContent=em.slice(0,2).toUpperCase();
+  $("#login").classList.add("hidden");
+  $("#app").classList.add("on");
+  renderAll();
+});
+$("#logout").addEventListener("click",()=>{
+  $("#app").classList.remove("on");
+  $("#login").classList.remove("hidden");
+});
+
+/* ---------- SIDEBAR ---------- */
+function renderSide(){
+  const nav=$("#side");nav.innerHTML="";
+  const grp=el("div","grp");
+  grp.appendChild(el("div","ttl","ライブラリー"));
+  CATEGORIES.forEach(cat=>{
+    const count = cat.id==="all"?COURSES.length:COURSES.filter(c=>c.cat===cat.id).length;
+    const b=el("button","navitem"+(state.cat===cat.id&&state.route==="library"?" active":""));
+    b.innerHTML=`<span class="ic">${cat.icon}</span><span>${cat.label}</span>`;
+    if(cat.isNew){b.insertAdjacentHTML("beforeend",`<span class="newtag">NEW</span>`);}
+    else{b.insertAdjacentHTML("beforeend",`<span class="ct tnum">${count}</span>`);}
+    b.onclick=()=>{state.cat=cat.id;state.route="library";state.q="";renderAll();};
+    grp.appendChild(b);
+  });
+  nav.appendChild(grp);
+
+  const grpA=el("div","grp");
+  grpA.appendChild(el("div","ttl","エージェント"));
+  const store=el("button","navitem"+(state.route==="agents"?" active":""));
+  store.innerHTML=`<span class="ic">🤖</span><span>スキルストア</span>`+
+    (owned.size?`<span class="ct tnum">${owned.size}</span>`:`<span class="newtag">NEW</span>`);
+  store.onclick=()=>{state.route="agents";renderAll();window.scrollTo(0,0);};
+  grpA.appendChild(store);
+  nav.appendChild(grpA);
+
+  const grp2=el("div","grp");
+  grp2.appendChild(el("div","ttl","マイページ"));
+  [["◔","学習の進捗"],["♡","お気に入り"],["⏱","受講履歴"],["⚙","設定"]].forEach(([ic,lb])=>{
+    const b=el("button","navitem");
+    b.innerHTML=`<span class="ic">${ic}</span><span>${lb}</span>`;
+    b.onclick=()=>alert("プロトタイプでは未実装のメニューです。");
+    grp2.appendChild(b);
+  });
+  nav.appendChild(grp2);
+}
+
+/* ---------- LIBRARY ---------- */
+function renderLibrary(){
+  const view=$("#view");view.innerHTML="";
+  const catObj=CATEGORIES.find(c=>c.id===state.cat);
+
+  view.appendChild(el("div","crumb",`<b>マイダッシュボード</b> / コース一覧`));
+
+  // header
+  const head=el("div","libhead");
+  head.innerHTML=`<h1><span>▦</span> ${catObj.label==="すべて表示"?"ライブラリー":catObj.label}</h1>`;
+  let list=COURSES.filter(c=>state.cat==="all"||c.cat===state.cat);
+  if(state.q){const q=state.q.toLowerCase();list=list.filter(c=>c.title.toLowerCase().includes(q)||c.sections.some(s=>s.lessons.some(l=>l.t.toLowerCase().includes(q))));}
+  head.appendChild(el("span","count tnum",`${list.length} コース`));
+  head.appendChild(el("div","spacer"));
+
+  const search=el("div","search",`<span class="ic">⌕</span>`);
+  const si=el("input");si.placeholder="コース名・レッスンで検索";si.value=state.q;
+  si.oninput=e=>{state.q=e.target.value;renderLibrary();si2focus();};
+  search.appendChild(si);head.appendChild(search);
+
+  const tog=el("div","viewtog");
+  tog.innerHTML=`<button class="${state.view==="grid"?"active":""}" data-v="grid" title="グリッド">▦</button><button class="${state.view==="list"?"active":""}" data-v="list" title="リスト">☰</button>`;
+  tog.querySelectorAll("button").forEach(b=>b.onclick=()=>{state.view=b.dataset.v;renderLibrary();});
+  head.appendChild(tog);
+  view.appendChild(head);
+
+  // content + aside
+  const wrap=el("div","contentgrid");
+  const colMain=el("div");
+  if(list.length===0){
+    colMain.appendChild(el("div","empty",`<div class="big">🔍</div>該当するコースがありません。<br>検索条件を変えてお試しください。`));
+  }else{
+    const grid=el("div","courses "+state.view);
+    list.forEach(c=>grid.appendChild(courseCard(c)));
+    colMain.appendChild(grid);
+  }
+  wrap.appendChild(colMain);
+  wrap.appendChild(renderAside());
+  view.appendChild(wrap);
+
+  let saved=state.q.length;
+  function si2focus(){/* keep caret */ const inp=$(".search input");if(inp){inp.focus();inp.setSelectionRange(saved,saved);} }
+}
+
+function courseCard(c){
+  const st=courseStats(c);
+  const cat=CATEGORIES.find(x=>x.id===c.cat);
+  const card=el("button","card");
+  card.innerHTML=`
+    <div class="thumb" style="background:${c.grad}">
+      <span class="cat">${cat?cat.label:""}</span>
+      <span class="glyph">${c.glyph}</span>
+      <span class="len tnum">${st.len}</span>
+    </div>
+    <div class="body">
+      <div class="title">${c.title}</div>
+      <div class="meta"><span>${c.sections.length} セクション</span><span>${st.total} レッスン</span></div>
+      <div class="prog">
+        <div class="bar"><i class="${st.pct===100?"done":""}" style="width:${st.pct}%"></i></div>
+        <div class="lbl"><span>${st.done}/${st.total} 完了</span><span class="pct">${st.pct}%</span></div>
+      </div>
+    </div>`;
+  card.onclick=()=>{state.route="detail";state.courseId=c.id;renderAll();window.scrollTo(0,0);};
+  return card;
+}
+
+function renderAside(){
+  const aside=el("div","aside");
+  // notices
+  const p1=el("div","panel");
+  p1.innerHTML=`<h3>🔔 お知らせ</h3>`;
+  [["NEW","最新モデル活用セミナー2026を公開しました"],["更新","生成AI実践コースにレッスンを追加"],["運営","メンテナンスのお知らせ（7/15 深夜）"]].forEach(([tag,txt])=>{
+    p1.insertAdjacentHTML("beforeend",`<div class="notice"><span class="tag">${tag}</span><span>${txt}</span></div>`);
+  });
+  aside.appendChild(p1);
+
+  // continue learning
+  const inprog=COURSES.map(c=>({c,st:courseStats(c)})).filter(x=>x.st.done>0&&x.st.pct<100).slice(0,3);
+  const p2=el("div","panel");
+  p2.innerHTML=`<h3>▶ 学習を続ける</h3>`;
+  if(inprog.length===0){
+    p2.insertAdjacentHTML("beforeend",`<div style="font-size:12.5px;color:var(--faint)">まだ受講中のコースはありません。<br>コースを選んで始めましょう。</div>`);
+  }else{
+    const mp=el("div","miniprog");
+    inprog.forEach(({c,st})=>{
+      const row=el("div","row");
+      const R=52,circ=2*Math.PI*15;
+      row.innerHTML=`
+        <svg class="ring" viewBox="0 0 40 40"><circle cx="20" cy="20" r="15" fill="none" stroke="var(--line)" stroke-width="4"/><circle cx="20" cy="20" r="15" fill="none" stroke="var(--accent)" stroke-width="4" stroke-linecap="round" stroke-dasharray="${circ}" stroke-dashoffset="${circ*(1-st.pct/100)}" transform="rotate(-90 20 20)"/><text x="20" y="24" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent-ink)">${st.pct}</text></svg>
+        <div><div class="t">${c.title}</div><div class="s tnum">${st.done}/${st.total} レッスン完了</div></div>`;
+      row.style.cursor="pointer";
+      row.onclick=()=>{state.route="detail";state.courseId=c.id;renderAll();window.scrollTo(0,0);};
+      mp.appendChild(row);
+    });
+    p2.appendChild(mp);
+  }
+  aside.appendChild(p2);
+  return aside;
+}
+
+/* ---------- DETAIL ---------- */
+let player={si:0,li:0};
+function renderDetail(){
+  const c=COURSES.find(x=>x.id===state.courseId);
+  const view=$("#view");view.innerHTML="";
+  const wrap=el("div","detail");
+
+  const back=el("button","backbtn",`← ライブラリーに戻る`);
+  back.onclick=()=>{state.route="library";renderAll();window.scrollTo(0,0);};
+  wrap.appendChild(back);
+
+  // player
+  player={si:player.si||0,li:player.li||0};
+  const cur=(c.sections[player.si]&&c.sections[player.si].lessons[player.li])||c.sections[0].lessons[0];
+  if(!(c.sections[player.si]&&c.sections[player.si].lessons[player.li])){player={si:0,li:0};}
+  const curKey=lkey(c.id,player.si,player.li);
+  const isDone=!!progress[curKey];
+  const pl=el("div","player");
+  pl.innerHTML=`
+    <div class="screen">
+      <span class="nowtag">▶ 再生中</span>
+      <button class="playbtn" title="プロトタイプでは再生されません">▶</button>
+      <span class="placeholder">※ 動画プレイヤーの枠です。本番では各レッスンの動画をここに埋め込みます。</span>
+    </div>
+    <div class="ctrl">
+      <span class="now">${cur.t}</span>
+      <span class="len tnum">${cur.d}</span>
+      <button class="mk ${isDone?"done":""}">${isDone?"✓ 完了済み":"完了にする"}</button>
+    </div>`;
+  pl.querySelector(".mk").onclick=()=>{
+    if(progress[curKey])delete progress[curKey];else progress[curKey]=true;
+    saveProgress();renderDetail();
+  };
+  wrap.appendChild(pl);
+
+  // header + progress
+  const st=courseStats(c);
+  const cat=CATEGORIES.find(x=>x.id===c.cat);
+  const dh=el("div","dhead");
+  dh.innerHTML=`
+    <div>
+      <h1>${c.title}</h1>
+      <div class="dmeta">
+        <span>${cat?cat.label:""}</span>
+        <span><b>${c.sections.length}</b> セクション</span>
+        <span><b>${st.total}</b> レッスン</span>
+        <span>総時間 <b class="tnum">${st.len}</b></span>
+      </div>
+    </div>
+    <div class="big"><div class="pct tnum">${st.pct}%</div><div class="cap">${st.done}/${st.total} 完了</div></div>`;
+  wrap.appendChild(dh);
+  const dbar=el("div","dbar");dbar.innerHTML=`<i style="width:${st.pct}%"></i>`;wrap.appendChild(dbar);
+
+  // bundled agents — その場で譲渡（受け取り）
+  const ags=courseAgents(c);
+  if(ags.length){
+    const b=el("div","bundle");
+    b.innerHTML=`<div class="bh">🤖 このコースで使えるエージェント</div>
+      <p class="bs">受講しながら、下のエージェントをその場で受け取って自分のものにできます。</p>`;
+    ags.forEach(a=>{
+      const has=owned.has(a.id);
+      const row=el("div","brow");
+      row.innerHTML=`<div class="ico" style="background:${a.grad}">${a.icon}</div>
+        <div class="info"><div class="nm">${a.name}</div><div class="tg">${a.tag}</div></div>`;
+      const btn=el("button","btn "+(has?"owned":"claim"),has?"✓ 受け取り済み":"＋ 受け取る");
+      if(!has)btn.onclick=()=>{grantAgent(a.id);toast(`「${a.name}」を受け取りました`,"🎉");renderDetail();renderSide();};
+      row.appendChild(btn);
+      b.appendChild(row);
+    });
+    wrap.appendChild(b);
+  }
+
+  // sections
+  c.sections.forEach((s,si)=>{
+    const sec=el("div","section"+(si===player.si?" open":""));
+    const doneCount=s.lessons.filter((l,li)=>progress[lkey(c.id,si,li)]).length;
+    const sh=el("button","sh");
+    sh.innerHTML=`<span class="snum">SECTION ${si+1}</span><span class="stitle">${s.title}</span><span class="scount tnum">${doneCount}/${s.lessons.length}</span><span class="chev">▶</span>`;
+    sh.onclick=()=>sec.classList.toggle("open");
+    sec.appendChild(sh);
+    const lz=el("div","lessons");
+    s.lessons.forEach((l,li)=>{
+      const k=lkey(c.id,si,li);
+      const done=!!progress[k];
+      const playing=(si===player.si&&li===player.li);
+      const lb=el("button","lesson"+(done?" done":"")+(playing?" playing":""));
+      lb.innerHTML=`<span class="check">✓</span><span class="lt">${l.t}</span><span class="ll tnum">${l.d} ▸</span>`;
+      lb.onclick=()=>{player={si,li};renderDetail();window.scrollTo({top:0,behavior:"smooth"});};
+      lz.appendChild(lb);
+    });
+    sec.appendChild(lz);
+    wrap.appendChild(sec);
+  });
+
+  view.appendChild(wrap);
+}
+
+/* ---------- AGENT STORE ---------- */
+function agentCard(a){
+  const has=owned.has(a.id);
+  const c=COURSES.find(x=>x.id===a.course);
+  const card=el("div","agentcard");
+  card.innerHTML=`
+    <div class="top">
+      <div class="ico" style="background:${a.grad}">${a.icon}</div>
+      <div style="flex:1"><div class="nm">${a.name}</div><div class="tg">${a.tag}</div></div>
+      ${has?`<span class="ownedmark">受け取り済み</span>`:``}
+    </div>
+    <div class="desc">${a.desc}</div>
+    ${c?`<div class="link">🎓 ${c.title}</div>`:``}
+    <div class="acts"></div>`;
+  const acts=card.querySelector(".acts");
+  if(has){
+    const use=el("button","btn use","▶ このエージェントを使う");
+    use.onclick=()=>toast(`「${a.name}」を起動します（プロトタイプ）`,"🤖");
+    const give=el("button","btn ghost","譲渡する");
+    give.onclick=()=>openTransfer(a);
+    acts.append(use,give);
+  }else{
+    const claim=el("button","btn claim","＋ その場で受け取る");
+    claim.onclick=()=>{grantAgent(a.id);toast(`「${a.name}」を受け取りました`,"🎉");renderAll();};
+    acts.appendChild(claim);
+  }
+  return card;
+}
+
+function renderAgents(){
+  const view=$("#view");view.innerHTML="";
+  view.appendChild(el("div","crumb",`<b>マイダッシュボード</b> / スキルストア`));
+
+  const head=el("div","libhead");
+  head.innerHTML=`<h1><span>🤖</span> エージェント / スキル</h1>`;
+  head.appendChild(el("span","count",`受け取り済み ${owned.size} / ${AGENTS.length}`));
+  view.appendChild(head);
+
+  view.insertAdjacentHTML("beforeend",
+    `<p style="font-size:13.5px;color:var(--muted);max-width:70ch;margin:-6px 0 26px">学ぶだけで終わりません。コースで使うAIエージェントを<b>その場で受け取って</b>自分のものにし、受け取ったエージェントは他の受講者へ<b>譲渡</b>することもできます。</p>`);
+
+  // owned
+  const mine=AGENTS.filter(a=>owned.has(a.id));
+  if(mine.length){
+    view.appendChild(el("div","sectlbl",`<span>✅ マイエージェント</span><span class="pill tnum">${mine.length}</span>`));
+    const g=el("div","agentgrid");mine.forEach(a=>g.appendChild(agentCard(a)));view.appendChild(g);
+  }
+
+  // available
+  const avail=AGENTS.filter(a=>!owned.has(a.id));
+  view.appendChild(el("div","sectlbl",
+    mine.length?`<span>＋ 受け取れるエージェント</span><span class="pill tnum">${avail.length}</span>`
+               :`<span>＋ 受け取れるエージェント</span><span class="pill tnum">${avail.length}</span>`));
+  if(avail.length===0){
+    view.appendChild(el("div","empty",`<div class="big">🎉</div>すべてのエージェントを受け取りました。`));
+  }else{
+    const g=el("div","agentgrid");avail.forEach(a=>g.appendChild(agentCard(a)));view.appendChild(g);
+  }
+}
+
+/* ---------- ROUTER ---------- */
+function renderAll(){
+  renderSide();
+  if(state.route==="detail")renderDetail();
+  else if(state.route==="agents")renderAgents();
+  else renderLibrary();
+}
+</script>
