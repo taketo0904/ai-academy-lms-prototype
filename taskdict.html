@@ -159,6 +159,28 @@
   .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:13px 20px;border-radius:12px;font-size:13.5px;font-weight:600;box-shadow:var(--shadow-lg);z-index:200;opacity:0;transition:opacity .25s,transform .25s;display:flex;align-items:center;gap:10px;max-width:92vw}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   .toast .em{font-size:18px}
+  /* news feed */
+  .newshead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+  .live{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--green);background:var(--green-wash);padding:5px 12px;border-radius:20px}
+  .live .pulse{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 1.7s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(18,183,106,.5)}70%{box-shadow:0 0 0 7px rgba(18,183,106,0)}100%{box-shadow:0 0 0 0 rgba(18,183,106,0)}}
+  @media(prefers-reduced-motion:reduce){.live .pulse{animation:none}}
+  .feed{display:flex;flex-direction:column;gap:12px;max-width:760px}
+  .news{display:flex;gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:15px 16px;box-shadow:var(--shadow);transition:border-color .15s}
+  .news:hover{border-color:var(--line-strong)}
+  .news.isnew{border-color:#bfe0db;background:linear-gradient(180deg,var(--green-wash),#fff)}
+  .news .nico{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;font-size:18px;color:#fff;flex-shrink:0}
+  .news .nbody{flex:1;min-width:0}
+  .news .ntop{display:flex;align-items:center;gap:9px;font-size:11px;color:var(--faint);margin-bottom:4px;flex-wrap:wrap}
+  .news .ntop .src{font-weight:700;color:var(--muted)}
+  .news .ntime{font-variant-numeric:tabular-nums}
+  .news .newnow{font-size:10px;font-weight:800;color:#fff;background:var(--green);padding:2px 7px;border-radius:5px}
+  .news .nt{font-size:15px;font-weight:800;line-height:1.42;margin-bottom:4px}
+  .news .ns{font-size:13px;color:var(--muted);line-height:1.6}
+  .news .ntags{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center}
+  .news .ntags .lbl{font-size:11px;color:var(--faint)}
+  .ntag{font-size:11px;font-weight:700;color:var(--accent-ink);background:var(--accent-wash);padding:3px 9px;border-radius:20px;border:none;cursor:pointer}
+  .ntag:hover{background:#e0dcf7}
   @media(max-width:760px){.layout{grid-template-columns:1fr}.side{display:none}.main{padding:18px}}
 </style>
 
@@ -224,6 +246,39 @@ const TASKS=[
   {id:"t30",cat:"US03",code:"US03.3.1",mid:"障害対応",name:"障害対応の一次切り分け支援",status:"build",fresh:true,agent:null},
 ];
 
+/* =====================================================================
+   時事ニュース フィード。収集エージェント（Web検索→要約）が自動投稿する場所。
+   本番ではこの配列に、収集エージェントが継続的にアイテムを追加する。
+   各ニュースを関連業務タスク（tasks）に紐づけ、「この情報が効く業務」へ導線。
+   ===================================================================== */
+const NEWS = [
+  {id:"n1", cat:"SP02", src:"AI法務トレンド", min:8,   tasks:["t11"],
+   title:"契約レビューAIの精度が大幅向上、条項リスク検出が実務レベルに",
+   summary:"最新モデルで契約書の不利な条項・欠落の検出精度が向上。NDA・業務委託のレビュー時間を短縮できる。"},
+  {id:"n2", cat:"CM01", src:"生成AIニュース", min:34,  tasks:["t14","t15"],
+   title:"画像・動画生成AIの商用利用ガイドラインが更新",
+   summary:"広告・SNSクリエイティブでの生成AI利用範囲が明確化。表記や権利周りの実務対応をまとめて解説。"},
+  {id:"n3", cat:"CM06", src:"データ活用ウォッチ", min:72, tasks:["t21"],
+   title:"表データからの自動ダッシュボード生成に新機能",
+   summary:"売上・KPIデータを渡すだけで見やすい可視化を自動生成。分析レポート作成の初速が上がる。"},
+  {id:"n4", cat:"SP01", src:"営業AIレポート", min:150, tasks:["t2"],
+   title:"議事録AIが多言語・話者分離に対応、商談記録の自動化が加速",
+   summary:"音声から要約・決定事項・タスクを自動抽出。海外案件の商談メモにも対応範囲が広がった。"},
+  {id:"n5", cat:"SP02", src:"人事AIトレンド", min:300, tasks:["t9"],
+   title:"採用スクリーニングのAI活用に関する新しい実務指針",
+   summary:"応募書類の一次評価にAIを使う際の公平性・説明可能性の勘所を整理。"},
+  {id:"n6", cat:"US03", src:"運用AIニュース", min:1440, tasks:["t30"],
+   title:"障害対応の一次切り分けをAIが支援、MTTR短縮の事例が登場",
+   summary:"ログとアラートから原因候補を提示。まだ専用エージェントは未整備だが需要が高まっている。"},
+];
+/* 自動投稿シミュレーション用（プロトタイプ）: 収集エージェントが新着を流し込む挙動 */
+const EXTRA_NEWS=[
+  {cat:"CM01",src:"生成AIニュース",tasks:["t16"],title:"新しいコピー生成モデルが公開、A/Bテスト向けの量産に強み",summary:"訴求軸ごとに大量のコピー候補を生成。LP・広告の検証サイクルを速められる。"},
+  {cat:"CM06",src:"データ活用ウォッチ",tasks:["t23"],title:"自由記述コメントの分類精度が向上、アンケート集計が自動化",summary:"論点別の分類と代表意見の要約が高精度に。VOC分析の手間を削減。"},
+  {cat:"SP01",src:"営業AIレポート",tasks:["t3"],title:"提案書ドラフト生成が業界テンプレに対応",summary:"ヒアリング内容から、業界別のフォーマットに沿った提案書の下書きを生成。"},
+  {cat:"DV15",src:"PMニュース",tasks:["t26"],title:"議事録から担当・期日付きタスクを自動抽出する機能が拡充",summary:"会議後の議事録から即タスク化。抜け漏れ防止と進行管理の負担軽減に。"},
+];
+
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
 const OKEY="task-agents-owned-v2";
@@ -231,6 +286,8 @@ let owned=new Set(JSON.parse(localStorage.getItem(OKEY)||"[]"));
 const saveOwned=()=>localStorage.setItem(OKEY,JSON.stringify([...owned]));
 const catOf=code=>CATS.find(c=>c.code===code);
 let state={cat:"all",view:"grid",q:"",route:"library",taskId:null};
+let liveNews=NEWS.map(n=>({...n})),newsTimer=null,extraIdx=0,justPushed=null;
+function ago(min){if(min<1)return"たった今";if(min<60)return`${min}分前`;if(min<1440)return`${Math.floor(min/60)}時間前`;return`${Math.floor(min/1440)}日前`;}
 
 let tt;function toast(m,em="✓"){let t=$("#toast");if(!t){t=el("div","toast");t.id="toast";document.body.appendChild(t);}t.innerHTML=`<span class="em">${em}</span><span>${m}</span>`;requestAnimationFrame(()=>t.classList.add("show"));clearTimeout(tt);tt=setTimeout(()=>t.classList.remove("show"),2900);}
 
@@ -247,6 +304,11 @@ function renderSide(){
     g.appendChild(b);
   });
   nav.appendChild(g);
+  const gn=el("div","grp");gn.appendChild(el("div","ttl","情報"));
+  const nb=el("button","navitem"+(state.route==="news"?" active":""));
+  nb.innerHTML=`<span class="ic">🗞️</span><span>時事ニュース</span><span class="newtag">自動更新</span>`;
+  nb.onclick=()=>{state.route="news";renderAll();window.scrollTo(0,0);};
+  gn.appendChild(nb);nav.appendChild(gn);
   const g2=el("div","grp");g2.appendChild(el("div","ttl","マイページ"));
   const mb=el("button","navitem"+(state.route==="mine"?" active":""));
   mb.innerHTML=`<span class="ic">🤖</span><span>マイエージェント</span>`+(myCount()?`<span class="ct tnum">${myCount()}</span>`:`<span class="newtag">NEW</span>`);
@@ -332,6 +394,9 @@ function renderAside(){
   if(mine.length===0){p2.insertAdjacentHTML("beforeend",`<div style="font-size:12.5px;color:var(--faint)">業務タスクを開いて「受け取る」を押すと、ここに貯まります。</div>`);}
   else{const mp=el("div","mini");mine.slice(0,4).forEach(t=>{const c=catOf(t.cat);const r=el("div","row");r.innerHTML=`<div class="ico" style="background:${c.grad}">🤖</div><div><div class="t">${t.agent.name}</div><div class="s">${t.name}</div></div>`;r.style.cursor="pointer";r.onclick=()=>{state.route="detail";state.taskId=t.id;renderAll();window.scrollTo(0,0);};mp.appendChild(r);});p2.appendChild(mp);}
   aside.appendChild(p2);
+  const p3=el("div","panel");p3.innerHTML=`<h3>🗞️ 最新ニュース <span class="live" style="margin-left:auto;padding:2px 9px;font-size:10.5px"><span class="pulse"></span>自動</span></h3>`;
+  liveNews.slice(0,3).forEach(n=>{const c=catOf(n.cat)||catOf("all");const row=el("div","notice");row.style.cursor="pointer";row.innerHTML=`<span class="tag" style="color:#fff;background:${c.grad}">${ago(n.min)}</span><span>${n.title}</span>`;row.onclick=()=>{state.route="news";renderAll();window.scrollTo(0,0);};p3.appendChild(row);});
+  aside.appendChild(p3);
   return aside;
 }
 
@@ -389,6 +454,48 @@ function renderMine(){
   const grid=el("div","cards grid");mine.forEach(t=>grid.appendChild(taskCard(t)));v.appendChild(grid);
 }
 
+/* 時事ニュース フィード */
+function newsCard(n){
+  const c=catOf(n.cat)||catOf("all");const isNew=n.id===justPushed;
+  const card=el("div","news"+(isNew?" isnew":""));
+  const tags=(n.tasks||[]).map(id=>{const t=TASKS.find(x=>x.id===id);return t?`<button class="ntag" data-task="${id}">${t.name}</button>`:"";}).join("");
+  card.innerHTML=`
+    <div class="nico" style="background:${c.grad}">${c.icon}</div>
+    <div class="nbody">
+      <div class="ntop"><span class="src">${n.src}</span><span>・</span><span class="ntime">${ago(n.min)}</span>${isNew?`<span class="newnow">NEW</span>`:``}</div>
+      <div class="nt">${n.title}</div>
+      <div class="ns">${n.summary}</div>
+      ${tags?`<div class="ntags"><span class="lbl">この情報が効く業務:</span>${tags}</div>`:``}
+    </div>`;
+  card.querySelectorAll('[data-task]').forEach(b=>b.onclick=()=>{state.route="detail";state.taskId=b.dataset.task;renderAll();window.scrollTo(0,0);});
+  return card;
+}
+function renderNews(){
+  const v=$("#view");v.innerHTML="";
+  v.appendChild(el("div","crumb",`<b>情報</b> / 時事ニュース`));
+  const head=el("div","newshead");
+  head.innerHTML=`<h1 style="font-size:21px;font-weight:800;margin:0">🗞️ 時事ニュース</h1><span class="live"><span class="pulse"></span>自動更新中</span><span style="font-size:12px;color:var(--faint)">最終更新: たった今</span>`;
+  v.appendChild(head);
+  v.appendChild(el("p","libsub","AI・業務に関わる最新情報を、収集エージェントが<b>自動で収集・要約して投稿</b>し続けます。各ニュースは関連する業務タスクに紐づき、そのまま使えるエージェントへ移動できます。"));
+  const feed=el("div","feed");
+  liveNews.forEach(n=>feed.appendChild(newsCard(n)));
+  v.appendChild(feed);
+  startNewsFeed();
+}
+function startNewsFeed(){
+  stopNewsFeed();
+  newsTimer=setInterval(()=>{
+    if(state.route!=="news"){stopNewsFeed();return;}
+    liveNews.forEach(n=>n.min=(n.min||0)+ (n.min<60?1:60)); // 既存を少し古く
+    const src=EXTRA_NEWS[extraIdx%EXTRA_NEWS.length];extraIdx++;
+    const item={...src,id:"live"+extraIdx,min:0};
+    liveNews.unshift(item);justPushed=item.id;
+    if(liveNews.length>16)liveNews.pop();
+    renderNews();
+  },14000);
+}
+function stopNewsFeed(){if(newsTimer){clearInterval(newsTimer);newsTimer=null;}}
+
 /* diag */
 function openDiag(){
   openModal("🧭 業務診断","あなたの業務に合わせて、基礎知識・業務特化・新鮮情報・スキル運用を診断し、最適なエージェントの組み合わせを提案します（プロトタイプ）。",
@@ -409,10 +516,15 @@ $("#segMine").onclick=()=>{state.route="mine";renderAll();};
 
 const myCount=()=>[...owned].filter(id=>TASKS.find(t=>t.id===id&&t.agent)).length;
 function renderAll(){
+  if(state.route!=="news")stopNewsFeed();
   renderSide();
   $("#segLib").classList.toggle("active",state.route==="library"||state.route==="detail");
   $("#segMine").classList.toggle("active",state.route==="mine");
-  if(state.route==="detail")renderDetail();else if(state.route==="mine")renderMine();else renderLibrary();
+  if(state.route==="detail")renderDetail();
+  else if(state.route==="mine")renderMine();
+  else if(state.route==="news")renderNews();
+  else renderLibrary();
 }
+$(".icobtn[title='お知らせ']").onclick=()=>{state.route="news";renderAll();window.scrollTo(0,0);};
 renderAll();
 </script>
