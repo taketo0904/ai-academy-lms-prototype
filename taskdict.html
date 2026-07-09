@@ -159,6 +159,31 @@
   .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:13px 20px;border-radius:12px;font-size:13.5px;font-weight:600;box-shadow:var(--shadow-lg);z-index:200;opacity:0;transition:opacity .25s,transform .25s;display:flex;align-items:center;gap:10px;max-width:92vw}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   .toast .em{font-size:18px}
+  /* setup guide */
+  .levels{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+  @media(max-width:640px){.levels{grid-template-columns:1fr}}
+  .lvl{background:var(--surface);border:1px solid var(--line-strong);border-radius:12px;padding:15px;text-align:left;box-shadow:var(--shadow);transition:border-color .15s,background .15s}
+  .lvl:hover{border-color:var(--accent)}
+  .lvl.on{border-color:var(--accent);background:var(--accent-wash);box-shadow:0 0 0 3px var(--accent-wash)}
+  .lvl .ln{font-size:11px;font-weight:800;color:var(--faint);letter-spacing:.04em}
+  .lvl.on .ln{color:var(--accent-ink)}
+  .lvl .lt{font-size:16px;font-weight:800;margin:4px 0 3px}
+  .lvl .ld{font-size:11.5px;color:var(--muted);line-height:1.5}
+  .pbar{height:8px;background:var(--line);border-radius:5px;overflow:hidden}
+  .pbar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#8b7bf0);border-radius:5px;transition:width .3s}
+  .steps2{display:flex;flex-direction:column;gap:10px;max-width:760px}
+  .step2{display:flex;gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:15px 16px;box-shadow:var(--shadow)}
+  .step2.done{background:var(--green-wash);border-color:#bfe0db}
+  .step2 .chk{width:26px;height:26px;border-radius:50%;border:2px solid var(--line-strong);flex-shrink:0;display:grid;place-items:center;font-size:14px;color:transparent;background:#fff}
+  .step2.done .chk{background:var(--green);border-color:var(--green);color:#fff}
+  .step2 .s2b{flex:1;min-width:0}
+  .step2 .s2n{font-size:11px;font-weight:800;color:var(--faint)}
+  .step2 .s2t{font-size:15px;font-weight:800;margin:2px 0 3px}
+  .step2.done .s2t{color:var(--muted)}
+  .step2 .s2d{font-size:13px;color:var(--muted);line-height:1.6}
+  .step2 .s2a{margin-top:10px;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--accent);color:var(--accent-ink);background:#fff;font-size:12px;font-weight:700;padding:6px 12px;border-radius:8px}
+  .step2 .s2a:hover{background:var(--accent-wash)}
+
   /* news feed */
   .newshead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
   .live{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--green);background:var(--green-wash);padding:5px 12px;border-radius:20px}
@@ -285,9 +310,47 @@ const OKEY="task-agents-owned-v2";
 let owned=new Set(JSON.parse(localStorage.getItem(OKEY)||"[]"));
 const saveOwned=()=>localStorage.setItem(OKEY,JSON.stringify([...owned]));
 const catOf=code=>CATS.find(c=>c.code===code);
-let state={cat:"all",view:"grid",q:"",route:"library",taskId:null};
+let state={cat:"all",view:"grid",q:"",route:"library",taskId:null,level:"beg"};
 let liveNews=NEWS.map(n=>({...n})),newsTimer=null,extraIdx=0,justPushed=null;
 function ago(min){if(min<1)return"たった今";if(min<60)return`${min}分前`;if(min<1440)return`${Math.floor(min/60)}時間前`;return`${Math.floor(min/1440)}日前`;}
+
+/* =====================================================================
+   セットアップ（スタートガイド）: 初級→中級→上級 の3レベル。
+   初級=スキル/エージェントがわからない方、中級=自分で設定しているが不足、上級=マネタイズ。
+   ===================================================================== */
+const goTo=(patch,fn)=>()=>{Object.assign(state,patch||{});if(fn)fn();renderAll();window.scrollTo(0,0);};
+const LEVELS=[
+  {key:"beg",icon:"🌱",label:"初級",sub:"スキル・エージェントがわからない方へ",
+   goal:"“AIエージェント”が何かを理解し、1つ受け取って使えるようになる",
+   steps:[
+     {n:"STEP 1",t:"「AIエージェント」とは？",d:"業務を代わりに進めてくれるAIの部品です。使い方を“学ぶ”のではなく、受け取って“使う”のが基本。"},
+     {n:"STEP 2",t:"自分の業務カテゴリを開く",d:"左の業務カテゴリ（営業・経理・マーケ等）から、あなたの仕事に近いものを選びます。",action:{label:"業務辞書を開く",go:goTo({route:"library",cat:"all"})}},
+     {n:"STEP 3",t:"タスクを開いて「受け取る」",d:"「使えるAIあり」のタスクを1つ開き、受け取るとマイエージェントに追加されます。"},
+     {n:"STEP 4",t:"実際に使ってみる",d:"マイエージェントから起動し、メモや資料を渡すだけ。下書き・整形まで自動化します。",action:{label:"マイエージェント",go:goTo({route:"mine"})}},
+     {n:"STEP 5",t:"無ければ「作ってもらう」",d:"欲しいエージェントが無い業務は、作成リクエストで1日以内に用意してもらえます。"},
+   ]},
+  {key:"mid",icon:"⚙️",label:"中級",sub:"自分で設定しているが、不足している方へ",
+   goal:"業務に合わせてエージェントを組み合わせ、抜けを埋める",
+   steps:[
+     {n:"STEP 1",t:"業務を棚卸しする",d:"日々の業務をタスク辞書に照合し、まだAI化していない領域を洗い出します。",action:{label:"業務辞書を開く",go:goTo({route:"library",cat:"all"})}},
+     {n:"STEP 2",t:"エージェントを組み合わせる",d:"1業務＝複数エージェントで前後工程をつなぎます（例：リストアップ→提案書→フォロー）。"},
+     {n:"STEP 3",t:"不足タスクを埋める",d:"足りない業務は作成リクエストで補完し、抜けを無くします。"},
+     {n:"STEP 4",t:"新鮮情報を業務に接続",d:"時事ニュースで最新ツール・手法を追い、より良いものへ差し替えます。",action:{label:"時事ニュース",go:goTo({route:"news"})}},
+     {n:"STEP 5",t:"パーソナライズ設定",d:"業界・役割などの業務文脈を登録し、情報とエージェントを自分向けに最適化（本番）。",action:{label:"業務診断",go:()=>openDiag()}},
+   ]},
+  {key:"adv",icon:"💰",label:"上級",sub:"どうマネタイズしていくか",
+   goal:"使えるスキルを収益化する",
+   steps:[
+     {n:"STEP 1",t:"得意業務をサービス化",d:"使えるエージェント群を、業務代行・効率化サービスとして外部に提供します。"},
+     {n:"STEP 2",t:"成果物を商品にする",d:"エージェントで作った提案書・レポート・動画などの成果物を納品・販売します。"},
+     {n:"STEP 3",t:"スキルを配布・譲渡する",d:"作ったエージェント（スキル）を他者へ渡す。受け取り／譲渡の仕組みで横展開。"},
+     {n:"STEP 4",t:"継続課金モデルにする",d:"新鮮情報＋エージェント使い放題のサブスク（月額）で継続収益をつくります。"},
+     {n:"STEP 5",t:"パートナー展開",d:"業界別にパッケージ化し、代理店・OEMで提供の面を広げます。"},
+   ]},
+];
+const SKEY="task-setup-done-v1";
+let doneSteps=new Set(JSON.parse(localStorage.getItem(SKEY)||"[]"));
+const saveDone=()=>localStorage.setItem(SKEY,JSON.stringify([...doneSteps]));
 
 let tt;function toast(m,em="✓"){let t=$("#toast");if(!t){t=el("div","toast");t.id="toast";document.body.appendChild(t);}t.innerHTML=`<span class="em">${em}</span><span>${m}</span>`;requestAnimationFrame(()=>t.classList.add("show"));clearTimeout(tt);tt=setTimeout(()=>t.classList.remove("show"),2900);}
 
@@ -295,6 +358,11 @@ function filtered(){let l=TASKS.filter(t=>state.cat==="all"||t.cat===state.cat);
 
 function renderSide(){
   const nav=$("#side");nav.innerHTML="";
+  const gg=el("div","grp");gg.appendChild(el("div","ttl","スタートガイド"));
+  const sb=el("button","navitem"+(state.route==="setup"?" active":""));
+  sb.innerHTML=`<span class="ic">🚀</span><span>セットアップ</span>`;
+  sb.onclick=()=>{state.route="setup";renderAll();window.scrollTo(0,0);};
+  gg.appendChild(sb);nav.appendChild(gg);
   const g=el("div","grp");g.appendChild(el("div","ttl","業務カテゴリ（大分類）"));
   CATS.forEach(c=>{
     const n=c.code==="all"?TASKS.length:TASKS.filter(t=>t.cat===c.code).length;
@@ -454,6 +522,38 @@ function renderMine(){
   const grid=el("div","cards grid");mine.forEach(t=>grid.appendChild(taskCard(t)));v.appendChild(grid);
 }
 
+/* セットアップ（スタートガイド） */
+function renderSetup(){
+  const v=$("#view");v.innerHTML="";
+  v.appendChild(el("div","crumb",`<b>スタートガイド</b> / セットアップ`));
+  const head=el("div","libhead");head.innerHTML=`<h1><span>🚀</span> セットアップ</h1>`;v.appendChild(head);
+  v.appendChild(el("p","libsub","レベルに合わせて、AIエージェントの使い始めから収益化までを順番に進められます。ステップを完了にすると進捗が記録されます。"));
+  const lv=el("div","levels");
+  LEVELS.forEach(L=>{const b=el("button","lvl"+(state.level===L.key?" on":""));
+    b.innerHTML=`<div class="ln">${L.icon} レベル</div><div class="lt">${L.label}</div><div class="ld">${L.sub}</div>`;
+    b.onclick=()=>{state.level=L.key;renderSetup();};lv.appendChild(b);});
+  v.appendChild(lv);
+  const L=LEVELS.find(x=>x.key===state.level)||LEVELS[0];
+  const done=L.steps.filter((s,i)=>doneSteps.has(L.key+":"+i)).length;
+  const pct=Math.round(done/L.steps.length*100);
+  const gp=el("div","panel");gp.style.marginBottom="18px";gp.style.maxWidth="760px";
+  gp.innerHTML=`<div style="font-size:11px;font-weight:800;color:var(--faint);letter-spacing:.05em">このレベルのゴール</div>
+    <div style="font-size:15px;font-weight:800;margin:4px 0 13px">${L.goal}</div>
+    <div class="pbar"><i style="width:${pct}%"></i></div>
+    <div style="font-size:12px;color:var(--muted);margin-top:7px" class="tnum">${done}/${L.steps.length} ステップ完了 ・ ${pct}%</div>`;
+  v.appendChild(gp);
+  const sw=el("div","steps2");
+  L.steps.forEach((s,i)=>{
+    const id=L.key+":"+i;const isDone=doneSteps.has(id);
+    const st=el("div","step2"+(isDone?" done":""));
+    st.innerHTML=`<button class="chk">✓</button><div class="s2b"><div class="s2n">${s.n}</div><div class="s2t">${s.t}</div><div class="s2d">${s.d}</div></div>`;
+    st.querySelector(".chk").onclick=()=>{if(doneSteps.has(id))doneSteps.delete(id);else doneSteps.add(id);saveDone();renderSetup();};
+    if(s.action){const a=el("button","s2a",`${s.action.label} →`);a.onclick=s.action.go;st.querySelector(".s2b").appendChild(a);}
+    sw.appendChild(st);
+  });
+  v.appendChild(sw);
+}
+
 /* 時事ニュース フィード */
 function newsCard(n){
   const c=catOf(n.cat)||catOf("all");const isNew=n.id===justPushed;
@@ -523,6 +623,7 @@ function renderAll(){
   if(state.route==="detail")renderDetail();
   else if(state.route==="mine")renderMine();
   else if(state.route==="news")renderNews();
+  else if(state.route==="setup")renderSetup();
   else renderLibrary();
 }
 $(".icobtn[title='お知らせ']").onclick=()=>{state.route="news";renderAll();window.scrollTo(0,0);};
