@@ -183,6 +183,18 @@
   .step2 .s2d{font-size:13px;color:var(--muted);line-height:1.6}
   .step2 .s2a{margin-top:10px;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--accent);color:var(--accent-ink);background:#fff;font-size:12px;font-weight:700;padding:6px 12px;border-radius:8px}
   .step2 .s2a:hover{background:var(--accent-wash)}
+  .lbadge{font-size:10.5px;font-weight:800;padding:3px 8px;border-radius:6px;letter-spacing:.02em}
+  .lbadge.term{background:var(--violet-wash);color:var(--violet)}
+  .lbadge.use{background:var(--green-wash);color:var(--green)}
+  .lbadge.money{background:#FBEEDC;color:#B45309}
+  .player{background:#0d1120;border-radius:16px;overflow:hidden;box-shadow:var(--shadow-lg);max-width:760px}
+  .player .screen{aspect-ratio:16/9;position:relative;display:grid;place-items:center;background:radial-gradient(80% 80% at 50% 35%,#22284a,#0d1120)}
+  .player .playbtn{width:74px;height:74px;border-radius:50%;background:rgba(255,255,255,.14);backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,.25);display:grid;place-items:center;color:#fff;font-size:26px;transition:transform .15s,background .15s}
+  .player .playbtn:hover{transform:scale(1.06);background:rgba(91,75,225,.5)}
+  .player .ph{position:absolute;bottom:14px;left:16px;right:16px;font-size:11.5px;color:rgba(255,255,255,.42)}
+  .imgframe{aspect-ratio:16/9;border-radius:16px;display:grid;place-items:center;color:#fff;box-shadow:var(--shadow-lg);position:relative;text-align:center;max-width:760px}
+  .imgframe .big{font-size:54px;filter:drop-shadow(0 4px 12px rgba(0,0,0,.25))}
+  .imgframe .cap{position:absolute;bottom:14px;left:16px;right:16px;font-size:11.5px;color:rgba(255,255,255,.85)}
 
   /* news feed */
   .newshead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
@@ -310,7 +322,7 @@ const OKEY="task-agents-owned-v2";
 let owned=new Set(JSON.parse(localStorage.getItem(OKEY)||"[]"));
 const saveOwned=()=>localStorage.setItem(OKEY,JSON.stringify([...owned]));
 const catOf=code=>CATS.find(c=>c.code===code);
-let state={cat:"all",view:"grid",q:"",route:"library",taskId:null,level:"beg"};
+let state={cat:"all",view:"grid",q:"",route:"library",taskId:null,level:"beg",lessonId:null};
 let liveNews=NEWS.map(n=>({...n})),newsTimer=null,extraIdx=0,justPushed=null;
 function ago(min){if(min<1)return"たった今";if(min<60)return`${min}分前`;if(min<1440)return`${Math.floor(min/60)}時間前`;return`${Math.floor(min/1440)}日前`;}
 
@@ -318,39 +330,36 @@ function ago(min){if(min<1)return"たった今";if(min<60)return`${min}分前`;i
    セットアップ（スタートガイド）: 初級→中級→上級 の3レベル。
    初級=スキル/エージェントがわからない方、中級=自分で設定しているが不足、上級=マネタイズ。
    ===================================================================== */
-const goTo=(patch,fn)=>()=>{Object.assign(state,patch||{});if(fn)fn();renderAll();window.scrollTo(0,0);};
 const LEVELS=[
-  {key:"beg",icon:"🌱",label:"初級",sub:"スキル・エージェントがわからない方へ",
-   goal:"“AIエージェント”が何かを理解し、1つ受け取って使えるようになる",
-   steps:[
-     {n:"STEP 1",t:"「AIエージェント」とは？",d:"業務を代わりに進めてくれるAIの部品です。使い方を“学ぶ”のではなく、受け取って“使う”のが基本。"},
-     {n:"STEP 2",t:"自分の業務カテゴリを開く",d:"左の業務カテゴリ（営業・経理・マーケ等）から、あなたの仕事に近いものを選びます。",action:{label:"業務辞書を開く",go:goTo({route:"library",cat:"all"})}},
-     {n:"STEP 3",t:"タスクを開いて「受け取る」",d:"「使えるAIあり」のタスクを1つ開き、受け取るとマイエージェントに追加されます。"},
-     {n:"STEP 4",t:"実際に使ってみる",d:"マイエージェントから起動し、メモや資料を渡すだけ。下書き・整形まで自動化します。",action:{label:"マイエージェント",go:goTo({route:"mine"})}},
-     {n:"STEP 5",t:"無ければ「作ってもらう」",d:"欲しいエージェントが無い業務は、作成リクエストで1日以内に用意してもらえます。"},
+  {key:"beg",icon:"🌱",label:"初級",sub:"スキル・エージェントがわからない方へ",grad:"linear-gradient(135deg,#5B4BE1,#8b7bf0)",
+   lessons:[
+     {id:"b1",type:"video",dur:"03:20",topic:"用語",title:"AIエージェントとは？",desc:"“業務を代わりに進めてくれるAIの部品”という考え方を、身近な例で解説します。学ぶのではなく「使う」感覚をつかみましょう。"},
+     {id:"b2",type:"video",dur:"02:45",topic:"用語",title:"スキルとエージェントの違い",desc:"よく混同される「スキル」と「エージェント」を整理。何がどう違い、どう呼び分けるかを図で示します。"},
+     {id:"b3",type:"image",topic:"使い方",title:"画面の見方（サイドバー・カード）",desc:"どこに何があるか。1枚の注釈付き画像で、業務カテゴリ・タスクカード・マイエージェントの位置を把握できます。"},
+     {id:"b4",type:"video",dur:"04:10",topic:"使い方",title:"エージェントを受け取る・使う",desc:"タスクを開く→受け取る→マイエージェントから起動、の流れを画面録画で実演します。"},
+     {id:"b5",type:"image",topic:"用語",title:"「新鮮情報」とは？",desc:"毎日届く時事ニュースの位置づけを図解。なぜ“学習”ではなく“新鮮情報”なのかを説明します。"},
    ]},
-  {key:"mid",icon:"⚙️",label:"中級",sub:"自分で設定しているが、不足している方へ",
-   goal:"業務に合わせてエージェントを組み合わせ、抜けを埋める",
-   steps:[
-     {n:"STEP 1",t:"業務を棚卸しする",d:"日々の業務をタスク辞書に照合し、まだAI化していない領域を洗い出します。",action:{label:"業務辞書を開く",go:goTo({route:"library",cat:"all"})}},
-     {n:"STEP 2",t:"エージェントを組み合わせる",d:"1業務＝複数エージェントで前後工程をつなぎます（例：リストアップ→提案書→フォロー）。"},
-     {n:"STEP 3",t:"不足タスクを埋める",d:"足りない業務は作成リクエストで補完し、抜けを無くします。"},
-     {n:"STEP 4",t:"新鮮情報を業務に接続",d:"時事ニュースで最新ツール・手法を追い、より良いものへ差し替えます。",action:{label:"時事ニュース",go:goTo({route:"news"})}},
-     {n:"STEP 5",t:"パーソナライズ設定",d:"業界・役割などの業務文脈を登録し、情報とエージェントを自分向けに最適化（本番）。",action:{label:"業務診断",go:()=>openDiag()}},
+  {key:"mid",icon:"⚙️",label:"中級",sub:"自分で設定しているが、不足している方へ",grad:"linear-gradient(135deg,#0EA5E9,#5B4BE1)",
+   lessons:[
+     {id:"m1",type:"video",dur:"05:30",topic:"使い方",title:"複数エージェントの組み合わせ方",desc:"1業務＝複数エージェントで前後工程をつなぐ方法（例：リストアップ→提案書→フォロー）を実演します。"},
+     {id:"m2",type:"image",topic:"使い方",title:"業務の棚卸しシート",desc:"自分の業務をタスク辞書に照合して抜けを見つけるための、記入例つきシートを画像で配布します。"},
+     {id:"m3",type:"video",dur:"03:15",topic:"使い方",title:"作成リクエストの出し方",desc:"未整備タスクのエージェントを1日以内で作ってもらう、リクエストの書き方のコツを解説します。"},
+     {id:"m4",type:"video",dur:"04:00",topic:"使い方",title:"時事ニュースを業務に活かす",desc:"新鮮情報から使える手法を拾い、エージェントを差し替える運用の流れを見せます。"},
+     {id:"m5",type:"image",topic:"用語",title:"パーソナライズ設定の項目",desc:"業界・役割などの業務文脈をどう登録するか。設定項目の意味を注釈画像で解説します。"},
    ]},
-  {key:"adv",icon:"💰",label:"上級",sub:"どうマネタイズしていくか",
-   goal:"使えるスキルを収益化する",
-   steps:[
-     {n:"STEP 1",t:"得意業務をサービス化",d:"使えるエージェント群を、業務代行・効率化サービスとして外部に提供します。"},
-     {n:"STEP 2",t:"成果物を商品にする",d:"エージェントで作った提案書・レポート・動画などの成果物を納品・販売します。"},
-     {n:"STEP 3",t:"スキルを配布・譲渡する",d:"作ったエージェント（スキル）を他者へ渡す。受け取り／譲渡の仕組みで横展開。"},
-     {n:"STEP 4",t:"継続課金モデルにする",d:"新鮮情報＋エージェント使い放題のサブスク（月額）で継続収益をつくります。"},
-     {n:"STEP 5",t:"パートナー展開",d:"業界別にパッケージ化し、代理店・OEMで提供の面を広げます。"},
+  {key:"adv",icon:"💰",label:"上級",sub:"どうマネタイズしていくか",grad:"linear-gradient(135deg,#F59E0B,#d97706)",
+   lessons:[
+     {id:"a1",type:"video",dur:"06:20",topic:"マネタイズ",title:"スキルで収益化する全体像",desc:"使えるエージェントをどうお金に変えるか。サービス化・商品化・継続課金の全体像を俯瞰します。"},
+     {id:"a2",type:"image",topic:"マネタイズ",title:"サービス化のパッケージ例",desc:"業務代行・効率化サービスとして外販する際の、パッケージ構成と価格の型を図で示します。"},
+     {id:"a3",type:"video",dur:"04:45",topic:"マネタイズ",title:"成果物を商品にする",desc:"エージェントで作った提案書・レポート・動画などの成果物を、納品・販売する流れを解説します。"},
+     {id:"a4",type:"video",dur:"05:10",topic:"マネタイズ",title:"サブスク継続課金の作り方",desc:"新鮮情報＋エージェント使い放題の月額モデルを設計する考え方を説明します。"},
+     {id:"a5",type:"image",topic:"マネタイズ",title:"代理店・OEM展開の図",desc:"業界別にパッケージ化し、代理店・OEMで面を広げる展開図を画像で示します。"},
    ]},
 ];
-const SKEY="task-setup-done-v1";
-let doneSteps=new Set(JSON.parse(localStorage.getItem(SKEY)||"[]"));
-const saveDone=()=>localStorage.setItem(SKEY,JSON.stringify([...doneSteps]));
+const findLesson=id=>{for(const L of LEVELS){const x=L.lessons.find(z=>z.id===id);if(x)return{L,les:x};}return null;};
+const SKEY="task-setup-viewed-v1";
+let viewed=new Set(JSON.parse(localStorage.getItem(SKEY)||"[]"));
+const saveViewed=()=>localStorage.setItem(SKEY,JSON.stringify([...viewed]));
 
 let tt;function toast(m,em="✓"){let t=$("#toast");if(!t){t=el("div","toast");t.id="toast";document.body.appendChild(t);}t.innerHTML=`<span class="em">${em}</span><span>${m}</span>`;requestAnimationFrame(()=>t.classList.add("show"));clearTimeout(tt);tt=setTimeout(()=>t.classList.remove("show"),2900);}
 
@@ -522,36 +531,75 @@ function renderMine(){
   const grid=el("div","cards grid");mine.forEach(t=>grid.appendChild(taskCard(t)));v.appendChild(grid);
 }
 
-/* セットアップ（スタートガイド） */
+/* セットアップ（用語・使い方の動画/画像レクチャー環境） */
+const topicClass=t=>t==="用語"?"term":t==="マネタイズ"?"money":"use";
+function lessonCard(L,les){
+  const v=viewed.has(les.id);
+  const card=el("button","card");
+  card.innerHTML=`
+    <div class="thumb" style="background:${L.grad}">
+      <span class="stat ${les.type==='video'?'ready':'build'}">${les.type==='video'?'▶ 動画':'🖼 画像'}</span>
+      ${v?`<span class="fresh" style="color:var(--green)">✓ 視聴済み</span>`:``}
+      <span class="glyph">${les.type==='video'?'▶':'🖼️'}</span>
+      ${les.dur?`<span class="code">${les.dur}</span>`:``}
+    </div>
+    <div class="body">
+      <div class="title">${les.title}</div>
+      <div class="meta"><span class="lbadge ${topicClass(les.topic)}">${les.topic}</span></div>
+    </div>`;
+  card.onclick=()=>{state.route="lesson";state.lessonId=les.id;renderAll();window.scrollTo(0,0);};
+  return card;
+}
 function renderSetup(){
   const v=$("#view");v.innerHTML="";
-  v.appendChild(el("div","crumb",`<b>スタートガイド</b> / セットアップ`));
-  const head=el("div","libhead");head.innerHTML=`<h1><span>🚀</span> セットアップ</h1>`;v.appendChild(head);
-  v.appendChild(el("p","libsub","レベルに合わせて、AIエージェントの使い始めから収益化までを順番に進められます。ステップを完了にすると進捗が記録されます。"));
+  v.appendChild(el("div","crumb",`<b>セットアップ</b> / 使い方レクチャー`));
+  const head=el("div","libhead");head.innerHTML=`<h1><span>🚀</span> セットアップ（使い方レクチャー）</h1>`;v.appendChild(head);
+  v.appendChild(el("p","libsub","用語の意味や使い方を、<b>動画と画像でレクチャー</b>する環境です。レベル別に、AIエージェントの基本から収益化までを学べます。"));
   const lv=el("div","levels");
   LEVELS.forEach(L=>{const b=el("button","lvl"+(state.level===L.key?" on":""));
     b.innerHTML=`<div class="ln">${L.icon} レベル</div><div class="lt">${L.label}</div><div class="ld">${L.sub}</div>`;
     b.onclick=()=>{state.level=L.key;renderSetup();};lv.appendChild(b);});
   v.appendChild(lv);
   const L=LEVELS.find(x=>x.key===state.level)||LEVELS[0];
-  const done=L.steps.filter((s,i)=>doneSteps.has(L.key+":"+i)).length;
-  const pct=Math.round(done/L.steps.length*100);
+  const done=L.lessons.filter(x=>viewed.has(x.id)).length;
+  const pct=Math.round(done/L.lessons.length*100);
   const gp=el("div","panel");gp.style.marginBottom="18px";gp.style.maxWidth="760px";
-  gp.innerHTML=`<div style="font-size:11px;font-weight:800;color:var(--faint);letter-spacing:.05em">このレベルのゴール</div>
-    <div style="font-size:15px;font-weight:800;margin:4px 0 13px">${L.goal}</div>
+  gp.innerHTML=`<div style="font-size:13px;font-weight:800;margin-bottom:10px">${L.icon} ${L.label} ・ ${L.sub}</div>
     <div class="pbar"><i style="width:${pct}%"></i></div>
-    <div style="font-size:12px;color:var(--muted);margin-top:7px" class="tnum">${done}/${L.steps.length} ステップ完了 ・ ${pct}%</div>`;
+    <div style="font-size:12px;color:var(--muted);margin-top:7px" class="tnum">${done}/${L.lessons.length} レッスン視聴 ・ ${pct}%</div>`;
   v.appendChild(gp);
-  const sw=el("div","steps2");
-  L.steps.forEach((s,i)=>{
-    const id=L.key+":"+i;const isDone=doneSteps.has(id);
-    const st=el("div","step2"+(isDone?" done":""));
-    st.innerHTML=`<button class="chk">✓</button><div class="s2b"><div class="s2n">${s.n}</div><div class="s2t">${s.t}</div><div class="s2d">${s.d}</div></div>`;
-    st.querySelector(".chk").onclick=()=>{if(doneSteps.has(id))doneSteps.delete(id);else doneSteps.add(id);saveDone();renderSetup();};
-    if(s.action){const a=el("button","s2a",`${s.action.label} →`);a.onclick=s.action.go;st.querySelector(".s2b").appendChild(a);}
-    sw.appendChild(st);
-  });
-  v.appendChild(sw);
+  const grid=el("div","cards grid");
+  L.lessons.forEach(les=>grid.appendChild(lessonCard(L,les)));
+  v.appendChild(grid);
+}
+function renderLesson(){
+  const f=findLesson(state.lessonId);if(!f){state.route="setup";return renderSetup();}
+  const {L,les}=f;const isV=viewed.has(les.id);
+  const v=$("#view");v.innerHTML="";
+  const wrap=el("div","detail");
+  const back=el("button","backbtn","← レクチャー一覧に戻る");back.onclick=()=>{state.route="setup";renderAll();window.scrollTo(0,0);};
+  wrap.appendChild(back);
+  const stage=el("div");
+  if(les.type==="video"){
+    stage.innerHTML=`<div class="player"><div class="screen"><button class="playbtn" title="プロトタイプでは再生されません">▶</button><span class="ph">※ 動画プレイヤーの枠です。本番ではこのレッスンの解説動画を埋め込みます。</span></div></div>`;
+  }else{
+    stage.innerHTML=`<div class="imgframe" style="background:${L.grad}"><div class="big">🖼️</div><span class="cap">※ 画像レクチャーの枠です。本番では注釈付きの解説画像を表示します。</span></div>`;
+  }
+  wrap.appendChild(stage);
+  const meta=el("div");meta.style.margin="20px 0 0";
+  meta.innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)">
+      <span class="lbadge ${topicClass(les.topic)}">${les.topic}</span>
+      <span>${L.icon} ${L.label}</span>${les.dur?`<span>・ ${les.dur}</span>`:`<span>・ 画像</span>`}
+    </div>
+    <h1 style="font-size:24px;font-weight:800;margin:10px 0 8px;letter-spacing:-.01em">${les.title}</h1>
+    <p style="font-size:14.5px;color:var(--muted);line-height:1.8;max-width:70ch">${les.desc}</p>`;
+  wrap.appendChild(meta);
+  const btn=el("button","btn "+(isV?"have":"get"));btn.style.maxWidth="280px";btn.style.marginTop="14px";
+  btn.textContent=isV?"✓ 視聴済み（もう一度見る場合はそのまま再生）":"視聴済みにする";
+  btn.onclick=()=>{if(viewed.has(les.id))viewed.delete(les.id);else viewed.add(les.id);saveViewed();renderLesson();};
+  wrap.appendChild(btn);
+  v.appendChild(wrap);
 }
 
 /* 時事ニュース フィード */
@@ -624,6 +672,7 @@ function renderAll(){
   else if(state.route==="mine")renderMine();
   else if(state.route==="news")renderNews();
   else if(state.route==="setup")renderSetup();
+  else if(state.route==="lesson")renderLesson();
   else renderLibrary();
 }
 $(".icobtn[title='お知らせ']").onclick=()=>{state.route="news";renderAll();window.scrollTo(0,0);};
