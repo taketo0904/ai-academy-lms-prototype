@@ -1,0 +1,204 @@
+<title>プラットフォーム バックエンド設計書</title>
+<style>
+  :root{
+    --paper:#F6F7F4;--card:#FFFFFF;--ink:#1A2233;--muted:#5B6472;--faint:#8A93A3;
+    --line:#E3E6E1;--line2:#CDD2CB;--teal:#0F766E;--teal-wash:#E2F1EF;--amber:#B45309;--amber-wash:#FBEEDC;
+    --green:#15803D;--green-wash:#E4F3E8;--red:#B91C1C;--red-wash:#FBE9E7;--slate:#334155;--violet:#6D46C7;--violet-wash:#EEE9F9;
+    --shadow:0 1px 2px rgba(26,34,51,.05),0 6px 20px rgba(26,34,51,.05);
+    --font:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",Meiryo,sans-serif;
+    --mono:"SF Mono",ui-monospace,"DejaVu Sans Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}html,body{margin:0;padding:0}
+  body{font-family:var(--font);color:var(--ink);background:var(--paper);line-height:1.75;-webkit-font-smoothing:antialiased}
+  .tnum{font-variant-numeric:tabular-nums}
+  .wrap{max-width:920px;margin:0 auto;padding:44px 24px 90px}
+  header{border-bottom:2px solid var(--ink);padding-bottom:24px;margin-bottom:14px}
+  .kicker{font-size:12px;font-weight:700;letter-spacing:.16em;color:var(--teal);text-transform:uppercase;margin-bottom:12px}
+  h1{font-size:clamp(26px,4vw,36px);line-height:1.25;margin:0 0 14px;font-weight:800;letter-spacing:-.01em;text-wrap:balance}
+  .lede{font-size:16.5px;color:var(--muted);margin:0;max-width:66ch}
+  .meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+  .chip{font-size:12px;font-weight:600;background:var(--card);border:1px solid var(--line2);border-radius:20px;padding:5px 13px;color:var(--slate)}
+  .chip b{color:var(--ink)}
+  h2{font-size:20px;font-weight:800;margin:52px 0 6px;letter-spacing:-.01em;display:flex;align-items:baseline;gap:12px}
+  h2 .no{font-size:13px;font-weight:800;color:var(--teal);background:var(--teal-wash);border-radius:7px;padding:2px 9px;flex-shrink:0}
+  h2+.sub{color:var(--muted);font-size:14.5px;margin:0 0 22px}
+  h3{font-size:15.5px;font-weight:800;margin:28px 0 10px}
+  p{margin:0 0 14px}a{color:var(--teal);text-decoration:none;border-bottom:1px solid var(--teal-wash)}
+  code{font-family:var(--mono);font-size:12.5px;background:var(--card);border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--ink)}
+  /* layer stack */
+  .stack{display:flex;flex-direction:column;gap:0;margin:24px 0 8px}
+  .lyr{background:var(--card);border:1px solid var(--line2);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow);position:relative}
+  .lyr:not(:last-child){margin-bottom:26px}
+  .lyr:not(:last-child):after{content:"↑ ↓";position:absolute;left:50%;bottom:-22px;transform:translateX(-50%);color:var(--line2);font-size:14px;letter-spacing:2px}
+  .lyr .lt{font-weight:800;font-size:14.5px;display:flex;align-items:center;gap:9px}
+  .lyr .lt .tag{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:5px}
+  .tag.front{background:var(--violet-wash);color:var(--violet)}
+  .tag.back{background:var(--teal-wash);color:var(--teal)}
+  .tag.data{background:var(--amber-wash);color:var(--amber)}
+  .lyr .ld{font-size:12.5px;color:var(--muted);margin-top:5px;line-height:1.6}
+  .item{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--teal);border-radius:10px;padding:18px 20px;margin-bottom:16px;box-shadow:var(--shadow)}
+  .item .ih{display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+  .item .ib{width:38px;height:38px;border-radius:10px;background:var(--teal-wash);display:grid;place-items:center;font-size:19px;flex-shrink:0}
+  .item .inm{font-size:16px;font-weight:800}
+  .item .ir{font-size:12px;color:var(--muted);font-weight:600}
+  .item .st{margin-left:auto;font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:20px}
+  .st.spec{background:var(--amber-wash);color:var(--amber)}
+  .st.ref{background:var(--green-wash);color:var(--green)}
+  .item dl{display:grid;grid-template-columns:96px 1fr;gap:8px 16px;margin:0;font-size:13.5px}
+  @media(max-width:560px){.item dl{grid-template-columns:1fr}}
+  .item dt{font-weight:700;color:var(--faint);font-size:11.5px;letter-spacing:.03em;padding-top:2px}
+  .item dd{margin:0;color:var(--slate)}
+  .item dd .api{font-family:var(--mono);font-size:12px;background:var(--paper);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+  .tw{overflow-x:auto;margin:16px 0 6px;border:1px solid var(--line);border-radius:10px}
+  table{border-collapse:collapse;width:100%;font-size:13.5px;background:var(--card);min-width:540px}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--paper);font-size:11.5px;font-weight:800;color:var(--muted);letter-spacing:.03em;white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  td .api,td code{font-family:var(--mono);font-size:12px}
+  .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .cheap{color:var(--green);font-weight:700}.mid{color:var(--amber);font-weight:700}
+  .box{border-radius:10px;padding:15px 18px;margin:16px 0;font-size:13.5px;line-height:1.7}
+  .box .bt{font-weight:800;font-size:13px;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+  .box.warn{background:var(--amber-wash);border:1px solid #eccf9f}.box.warn .bt{color:var(--amber)}
+  .box.info{background:var(--teal-wash);border:1px solid #b8ded9}.box.info .bt{color:var(--teal)}
+  .box.risk{background:var(--red-wash);border:1px solid #f0c5bf}.box.risk .bt{color:var(--red)}
+  ul,ol{margin:6px 0 16px;padding-left:22px}li{margin-bottom:6px}
+  pre{background:#0d1120;color:#e7ecff;border-radius:12px;padding:16px 18px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.65;box-shadow:var(--shadow)}
+  pre .c{color:#7f8bb3}pre .k{color:#c792ea}pre .s{color:#c3e88d}
+  .flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;font-weight:600;margin:6px 0 16px}
+  .flow .n{background:var(--teal-wash);color:var(--teal);padding:5px 11px;border-radius:8px}
+  .flow .a{color:var(--faint)}
+  .phase{display:flex;gap:14px;margin-bottom:14px;align-items:flex-start}
+  .phase .pn{flex-shrink:0;width:30px;height:30px;border-radius:8px;background:var(--ink);color:#fff;display:grid;place-items:center;font-weight:800;font-size:13px}
+  .phase .pc .pt{font-weight:800;font-size:14.5px}.phase .pc .pd{font-size:13px;color:var(--muted)}
+  footer{margin-top:60px;padding-top:18px;border-top:1px solid var(--line);font-size:12px;color:var(--faint)}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="kicker">Backend / Infra Design · 技術設計書</div>
+  <h1>プラットフォーム バックエンド設計</h1>
+  <p class="lede">AIエージェント・サブスクの裏側。①サービス側API（プラットフォーム内完結）②情報源の取り込みパイプライン ③Obsidian知識構造化 ④スコアリング学習ループ の4つの設計仕様と概算コスト。</p>
+  <div class="meta">
+    <span class="chip">対象: <b>バックエンド4項目</b></span>
+    <span class="chip">LLM: <b>Claude（サービス側負担）</b></span>
+    <span class="chip">前提: <b>月額4,000〜9,800円</b></span>
+    <span class="chip">作成: <b>2026-07-09</b></span>
+  </div>
+</header>
+
+<div class="box warn">
+  <div class="bt">◆ 前提: これはサーバー側の設計。静的プロトタイプでは動かない</div>
+  公開中の <code>taskdict</code> プロトタイプは<b>フロントエンド</b>（見た目と操作）です。ここで設計する4項目は<b>サーバー・APIキー・データ基盤・デプロイ</b>が必要で、静的サイトの中では動きません。本書はそれを実際に動かすための青写真＋リファレンス実装です。
+</div>
+
+<h2><span class="no">01</span> 全体アーキテクチャ</h2>
+<p class="sub">フロント（既存プロトタイプ）の下に、API・エージェント実行・データ基盤の3層を敷く。ユーザーはブラウザ内で完結し、APIコストはサービス側が負担する（会議決定事項）。</p>
+<div class="stack">
+  <div class="lyr"><div class="lt">フロントエンド <span class="tag front">既存</span></div><div class="ld">taskdict プロトタイプ（業務辞書・エージェント・時事ニュース・連携ワークフロー・レクチャー）。ユーザーはボタン一つで成果物を得る。</div></div>
+  <div class="lyr"><div class="lt">① サービス側API ゲートウェイ <span class="tag back">本書</span></div><div class="ld">認証（APIキー／電話番号認証）・課金判定・エージェント実行の受け口。ユーザーは自分のClaude契約なしで、プラットフォーム内で完結して使える。</div></div>
+  <div class="lyr"><div class="lt">エージェント実行ランタイム <span class="tag back">本書</span></div><div class="ld">辞書の各エージェント定義（入力→出力）と連携ワークフローを、Claude API で実行。特化型を直列連携。人間テスト（直氏・小林氏）で品質担保。</div></div>
+  <div class="lyr"><div class="lt">データ基盤 <span class="tag data">本書</span></div><div class="ld">② 取り込みパイプライン（記事/PDF/PR TIMES → 要約 → 索引）・③ Obsidian知識構造化・④ スコアリング学習ループ。辞書とニュースへ鮮度と精度を供給し続ける。</div></div>
+</div>
+
+<h2><span class="no">02</span> ① サービス側API（プラットフォーム内完結）</h2>
+<p class="sub">ユーザーのClaude/GitHub連携を不要にし、サービス側でAPIを用意。ブラウザ内で受け取り→実行→成果物までを完結させる。</p>
+<div class="item">
+  <div class="ih"><div class="ib">🔌</div><div><div class="inm">エージェント実行API</div><div class="ir">Platform-completed Agent Runtime</div></div><span class="st ref">リファレンス実装あり</span></div>
+  <dl>
+    <dt>役割</dt><dd>フロントからの「このエージェントを使う」を受け、Claudeでエージェント定義（入力→出力）を実行して成果物を返す。連携ワークフローは複数エージェントを直列実行。</dd>
+    <dt>実装</dt><dd><span class="api">FastAPI</span>（or Node）＋ 公式 <span class="api">anthropic</span> SDK。モデルは難易度で出し分け（定型=Haiku、企画/レビュー=Opus）。ストリーミングで逐次返却。</dd>
+    <dt>認証</dt><dd>ログイン＋発行APIキー。<b>電話番号認証</b>で無料乱用を防止（会議提案）。プランで利用回数・機能を制御。</dd>
+    <dt>課金判定</dt><dd>標準（月5本等の上限）／プレミアム（全機能）をAPI側で判定し、上限超過はアップセル誘導。</dd>
+    <dt>コスト</dt><dd>APIコストはサービス側負担。1実行あたりのClaude費は小さく（後述）、月額に十分収まる見通し。</dd>
+  </dl>
+</div>
+<h3>主要エンドポイント（案）</h3>
+<div class="tw"><table>
+  <thead><tr><th>メソッド / パス</th><th>役割</th></tr></thead>
+  <tbody>
+    <tr><td><code>POST /v1/agents/{id}/run</code></td><td>単体エージェントを実行（入力→出力・ストリーミング）</td></tr>
+    <tr><td><code>POST /v1/workflows/{id}/run</code></td><td>連携ワークフロー（複数エージェント直列）を実行</td></tr>
+    <tr><td><code>GET /v1/agents?q=</code></td><td>業務タスク辞書の検索</td></tr>
+    <tr><td><code>POST /v1/agents/requests</code></td><td>未整備タスクのエージェント作成リクエスト（1日以内）</td></tr>
+    <tr><td><code>GET /v1/news</code></td><td>時事ニュース（重複除去済み）を取得</td></tr>
+    <tr><td><code>POST /v1/events</code></td><td>表示/クリック/使用/DL イベント記録（④の入力）</td></tr>
+  </tbody>
+</table></div>
+<p style="font-size:12.5px;color:var(--muted)">※ リファレンス実装（FastAPI）はリポジトリの <code>backend/</code> に同梱。要デプロイ・APIキー設定（この環境では未実行）。</p>
+
+<h2><span class="no">03</span> ② 情報源の取り込みパイプライン</h2>
+<p class="sub">海外の最新記事・事例、書籍PDF＋OCR、PR TIMESの過去プレスをAIに読ませ、「即実行できる仕組み」と時事ニュースの供給源にする。</p>
+<div class="flow"><span class="n">取得</span><span class="a">→</span><span class="n">正規化（PDF/OCR・本文抽出）</span><span class="a">→</span><span class="n">Claudeで要約・構造化<br>（重複しない制約）</span><span class="a">→</span><span class="n">索引・保存</span><span class="a">→</span><span class="n">辞書 / ニュースへ供給</span></div>
+<div class="tw"><table>
+  <thead><tr><th>情報源</th><th>取得方法</th><th>用途</th></tr></thead>
+  <tbody>
+    <tr><td>海外の最新記事・事例</td><td><span class="api">Web検索API（Tavily）</span>／RSS で収集</td><td>時事ニュース・新スキルの種</td></tr>
+    <tr><td>書籍（PDF）</td><td>PDF化 → <span class="api">OCR</span>（テキスト化）</td><td>戦略立案・ノウハウの学習素材</td></tr>
+    <tr><td>PR TIMES 過去プレス</td><td>スクレイピング（規約順守・レート制御）</td><td>成功事例の分析・施策の裏付け</td></tr>
+  </tbody>
+</table></div>
+<div class="box info"><div class="bt">◆ 「重複しない」を仕組みで担保</div>
+取り込み時に既出コンテンツと突合し、<b>過去に出した情報と重複しないものだけ</b>を要約・投稿する（プロトタイプのニュース自動フィードで実装済みのロジックを、本番はDB照合で恒久化）。情報の鮮度＝解約理由をなくす最大の価値。</div>
+<p style="font-size:12.5px;color:var(--muted)">リファレンス: <code>backend/pipeline/ingest.py</code>（取得→要約→重複チェック→保存）を同梱。</p>
+
+<h2><span class="no">04</span> ③ Obsidian 知識構造化・フローチャート自動生成</h2>
+<p class="sub">取り込んだ知識を Obsidian に構造化して蓄積し、エージェント連携（スキル図）をフローチャートとして自動生成する運用フロー。中川さんの既存 Obsidian OS（CC＋Codex運用）に接続する。</p>
+<div class="item">
+  <div class="ih"><div class="ib">🧠</div><div><div class="inm">Obsidian 運用フロー</div><div class="ir">Knowledge Vault ＋ Auto Flowchart</div></div><span class="st spec">運用設計</span></div>
+  <dl>
+    <dt>役割</dt><dd>要約済み知識・エージェント定義・連携ワークフローを Vault に蓄積し、<b>Mermaid でフローチャート（スキル図）を自動生成</b>して可視化。</dd>
+    <dt>構成</dt><dd>Vault: <code>知識/</code>（取り込み要約）・<code>エージェント/</code>（入出力定義）・<code>ワークフロー/</code>（連携＝スキル図）。CC/Codex がノートを更新。</dd>
+    <dt>自動化</dt><dd>ワークフロー定義（入力→出力の連鎖）から <span class="api">Mermaid</span> 記法を生成しノートに埋め込む。フロントの「スキル図」と同じ構造を共有。</dd>
+    <dt>接続</dt><dd>Google Drive上の OS_Vault と同期。パイプライン②の出力をVaultへ、Vaultの成果を辞書・ニュースへ。</dd>
+  </dl>
+</div>
+<pre><span class="c"># ワークフロー定義 → Mermaid（自動生成の例）</span>
+<span class="k">flowchart LR</span>
+  A[調査] --> B[企画] --> C[台本] --> D[素材生成]
+  D --> E[紐付け] --> F[動画生成] --> G[編集] --> H[レビュー] --> I[説明文]</pre>
+<p style="font-size:12.5px;color:var(--muted)">リファレンス: <code>backend/obsidian/flowgen.py</code>（ワークフロー定義→Mermaidノート生成）を同梱。</p>
+
+<h2><span class="no">05</span> ④ スコアリング → AI学習ループ（精度向上）</h2>
+<p class="sub">アウトプットの反応（表示・クリック・使用・DL）をスコア化し、プロンプト改善・エージェント優先度・新着選定にフィードバックする継続改善ループ。</p>
+<div class="flow"><span class="n">イベント収集<br>（表示/クリック/使用/DL）</span><span class="a">→</span><span class="n">スコア算出<br>（CTR・完了率等）</span><span class="a">→</span><span class="n">フィードバック</span><span class="a">→</span><span class="n">プロンプト改善 /<br>優先度 / 新着選定</span></div>
+<div class="tw"><table>
+  <thead><tr><th>指標</th><th>取り方</th><th>使い道</th></tr></thead>
+  <tbody>
+    <tr><td>クリック率（CTR）</td><td>ニュース・エージェントの表示→クリック</td><td>並び順・新着選定の最適化</td></tr>
+    <tr><td>使用率・完了率</td><td>受け取り→実際の実行→完了</td><td>人気エージェントの強化、弱いものの改善</td></tr>
+    <tr><td>成果物の採用</td><td>DL・コピー・「使えた」の反応</td><td>プロンプト／エージェント定義の改善学習</td></tr>
+  </tbody>
+</table></div>
+<div class="box risk"><div class="bt">▲ 品質担保は人間確認が必須（会議強調）</div>
+AI生成物が意図通りかは<b>AI自身では判断できず、人間の確認が不可欠</b>。スコアリングは自動だが、最終品質は<b>直氏・小林氏のテスト</b>で担保する。自動化困難な工程として体制に組み込む。</div>
+<p style="font-size:12.5px;color:var(--muted)">リファレンス: <code>backend/scoring/score.py</code>（イベント集計→スコア→改善提案）を同梱。</p>
+
+<h2><span class="no">06</span> コスト試算</h2>
+<p class="sub">サービス側APIコスト（Claude）は1実行あたり小さく、月額（4,000〜9,800円 ≒ $27〜$65）に十分収まる。</p>
+<div class="tw"><table>
+  <thead><tr><th>コスト源</th><th>単価目安</th><th>月額への効き</th></tr></thead>
+  <tbody>
+    <tr><td>エージェント1実行（Claude）</td><td class="num">約 <b>$0.05〜0.30</b></td><td class="cheap">小さい</td></tr>
+    <tr><td>標準プラン（月5本想定）</td><td class="num">約 <b>$0.3〜1.5</b>／人月</td><td class="cheap">粗利大（対 ¥4,000〜5,000）</td></tr>
+    <tr><td>プレミアム（多用・100本想定）</td><td class="num">約 <b>$5〜30</b>／人月</td><td class="mid">要監視（対 ¥9,800）</td></tr>
+    <tr><td>取り込みパイプライン</td><td class="num">検索=ほぼ無料・OCR/計算=小</td><td class="cheap">小さい</td></tr>
+    <tr><td>ニュース要約（Claude）</td><td class="num">1件 数円〜</td><td class="cheap">小さい</td></tr>
+  </tbody>
+</table></div>
+<div class="box info"><div class="bt">◆ 結論: 粗利は健全、ただしヘビーユーザーは要監視</div>
+標準プランはClaude費が月$1前後で粗利が大きい。プレミアムの使い放題は上限（回数・DL）と<b>モデルの出し分け（定型=Haikuで安く）</b>でコストを抑える設計が必須。会議の「1人あたりAPIコストは高額にならない」見通しと整合。</div>
+
+<h2><span class="no">07</span> リスク・未決 と 段階導入</h2>
+<ul>
+  <li><b>API乱用・原価:</b> 電話番号認証＋利用上限＋モデル出し分けで、プレミアム使い放題の原価を制御。</li>
+  <li><b>スクレイピングの規約:</b> PR TIMES等は利用規約・レート制御・robots順守。取得可否を事前確認。</li>
+  <li><b>人間テストの体制:</b> 品質はAIで自動判定できない。直氏・小林氏のテスト工程を運用に固定（単純労働では代替不可）。</li>
+  <li><b>スケール:</b> 同時実行数・レート制限（Claude側／自社側）を監視し、キューイングで平準化。</li>
+</ul>
+<div class="phase"><div class="pn">1</div><div class="pc"><div class="pt">サービス側API（最小）を立てる</div><div class="pd"><code>POST /agents/{id}/run</code> だけ先に実装し、フロントの「使う」を本物にする。認証・課金判定は後追い。</div></div></div>
+<div class="phase"><div class="pn">2</div><div class="pc"><div class="pt">取り込みパイプライン＋ニュース供給</div><div class="pd">Tavily/RSS→要約→重複チェック→保存を回し、時事ニュースを実データで自動供給。Obsidian蓄積を接続。</div></div></div>
+<div class="phase"><div class="pn">3</div><div class="pc"><div class="pt">スコアリング学習ループ＋テスト体制</div><div class="pd">イベント収集→スコア→改善を稼働。直氏・小林氏のテストを品質ゲートに。連携ワークフローを本番接続。</div></div></div>
+
+<footer>プラットフォーム バックエンド設計書 v1.0 ／ 4項目はサーバー側実装（要デプロイ・APIキー）。リファレンス実装は <code>backend/</code> に同梱（このセッションでは未実行）。外部提出前に⚔️指揮官レビュー推奨。</footer>
+</div>
