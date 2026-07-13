@@ -1084,8 +1084,15 @@ function renderProfile(){
   act.appendChild(clr);v.appendChild(act);
 }
 
-/* 作成リクエストフォーム（入口A: ユーザー本人が依頼） */
+/* 作成リクエストフォーム（入口A: ユーザー本人が依頼・契約者アカウント限定） */
+const isSubscriber=()=>getPlan()!=="free";
 function openRequestForm(name,cat){
+  if(!isSubscriber()){
+    openModal("🔒 作成リクエストは契約者限定です","AIエージェントの作成リクエストは、有料プラン（標準・プレミアム）の契約者アカウントのみご利用いただけます。無料プランでは辞書・ニュース・お試し実行までご利用いただけます。",
+      `<button class="btn get" id="toPlansFromReq">プランを見てアップグレード</button>`);
+    const b=$("#toPlansFromReq");if(b)b.onclick=()=>{$("#mscrim").classList.remove("on");state.route="plans";renderAll();window.scrollTo(0,0);};
+    return;
+  }
   openModal("🛠️ エージェント作成をリクエスト","欲しい業務のエージェントを依頼します。生成→検証AIを通過すると、承認キューに下書きとして並びます。",
     `<div class="reqfield"><label>業務名</label><input id="rqName" value="${(name||"").replace(/"/g,"&quot;")}"></div>
      <div class="reqfield"><label>やりたいこと</label><textarea id="rqWant" placeholder="例: 検索結果から見込み客を、新規リードだけ抽出したい"></textarea></div>
