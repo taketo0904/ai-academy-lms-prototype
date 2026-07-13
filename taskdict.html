@@ -523,6 +523,36 @@ const ROLE_KEY="task-role-v1";
 const getRole=()=>localStorage.getItem(ROLE_KEY)||"member";
 const setRole=r=>localStorage.setItem(ROLE_KEY,r);
 const isAdmin=()=>getRole()==="admin";
+/* API接続: URLを設定すると本番APIを呼ぶ。未設定ならサンプルにフォールバック。 */
+const API_BASE_KEY="task-api-base-v1",API_KEY_KEY="task-api-key-v1";
+const getApiBase=()=>localStorage.getItem(API_BASE_KEY)||"";
+const getApiKey=()=>localStorage.getItem(API_KEY_KEY)||"";
+const apiConnected=()=>!!getApiBase();
+/* 成果物をファイルとして保存（実ダウンロード） */
+function downloadText(filename,text){
+  try{
+    const blob=new Blob([text],{type:"text/plain;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    toast("ダウンロードしました","⬇️");
+  }catch(e){toast("この環境ではDL不可（公開URLでは可能）","⬇️");}
+}
+/* エージェントAPI実行（ストリーミング対応・失敗時はメッセージ表示） */
+async function callAgentApi(path,body,resultEl){
+  const base=getApiBase().replace(/\/$/,"");const key=getApiKey();
+  resultEl.textContent="実行中…";
+  try{
+    const res=await fetch(base+path,{method:"POST",headers:{"content-type":"application/json",...(key?{"x-api-key":key}:{})},body:JSON.stringify(body)});
+    if(!res.ok){resultEl.textContent=`エラー: HTTP ${res.status}。APIのデプロイ・認証・CORS設定をご確認ください。`;return null;}
+    if(res.body&&res.body.getReader){
+      const reader=res.body.getReader();const dec=new TextDecoder();let out="";resultEl.textContent="";
+      for(;;){const {done,value}=await reader.read();if(done)break;out+=dec.decode(value,{stream:true});resultEl.textContent=out;}
+      return out;
+    }
+    const txt=await res.text();resultEl.textContent=txt;return txt;
+  }catch(e){resultEl.textContent=`接続できませんでした（${e.message}）。API未デプロイ／CORS設定をご確認ください。`;return null;}
+}
 const catOf=code=>CATS.find(c=>c.code===code);
 let state={cat:"all",view:"grid",q:"",route:"library",taskId:null,level:"beg",lessonId:null,flowId:null,tag:null};
 let liveNews=NEWS.map(n=>({...n})),newsTimer=null,extraIdx=0,justPushed=null;
@@ -831,7 +861,33 @@ function renderFlow(){
     rail.appendChild(st);
   });
   wrap.appendChild(rail);
+  // このワークフローを実行（各ステップを直列連携。前段の出力→次段の入力）
+  wrap.appendChild(el("div","dsec",`<div class="lb" style="margin-top:24px">このワークフローを実行</div>`));
+  const conn=apiConnected();
+  const runbox=el("div");runbox.style.maxWidth="760px";
+  runbox.innerHTML=`<div class="reqfield"><label>最初の入力（${w.steps[0].in}）</label><textarea id="wfIn" placeholder="ここに入力"></textarea></div>
+    <button class="btn get" id="wfGo" style="width:auto;padding:11px 20px">${conn?"▶ ワークフローを実行":"▶ サンプルで実行"}</button>
+    <div class="output" id="wfOut" style="margin-top:14px;display:none"></div>
+    <div id="wfActs" style="display:none;gap:10px;margin-top:12px"><button class="btn get" id="wfCopy" style="flex:1">コピー</button><button class="btn use" id="wfDl" style="flex:1;margin-top:0">ダウンロード</button></div>`;
+  wrap.appendChild(runbox);
   v.appendChild(wrap);
+  $("#wfGo").onclick=async()=>{
+    if(!isSubscriber()){openModal("🔒 ワークフロー実行は契約者限定です","連携ワークフローの実行は有料プラン（標準・プレミアム）でご利用いただけます。",`<button class="btn get" id="toPlansWf">プランを見てアップグレード</button>`);const b=$("#toPlansWf");if(b)b.onclick=()=>{$("#mscrim").classList.remove("on");state.route="plans";renderAll();window.scrollTo(0,0);};return;}
+    if(getUsage()>=limitFor(getPlan())){openUpsell();return;}
+    if(getPlan()!=="premium")setUsage(getUsage()+1);
+    const input=($("#wfIn").value||"").trim();const out=$("#wfOut");out.style.display="block";
+    let text;
+    if(conn){text=await callAgentApi(`/v1/workflows/${w.id}/run`,{input},out);}
+    else{
+      let cur=input||"（未入力）";const lines=[`【ワークフロー: ${w.name}】（サンプル実行）\n`];
+      w.steps.forEach((s,i)=>{
+        if(s.build){lines.push(`▼ STEP ${i+1} ${s.agent}（未整備・スキップ）`);return;}
+        const o=`${s.out}（サンプル）`;lines.push(`▼ STEP ${i+1} ${s.agent}\n  入力: ${cur}\n  出力: ${o}`);cur=o;
+      });
+      lines.push(`\n＝ 最終成果物 ＝\n${cur}`);text=lines.join("\n");out.textContent=text;
+    }
+    if(text){const a=$("#wfActs");if(a)a.style.display="flex";const cp=$("#wfCopy");if(cp)cp.onclick=async()=>{try{await navigator.clipboard.writeText(out.textContent);toast("コピーしました");}catch(e){toast("コピーは公開URLで可能","📋");}};const dl=$("#wfDl");if(dl)dl.onclick=()=>downloadText(`${w.name}.txt`,out.textContent);}
+  };
 }
 
 /* セットアップ（用語・使い方の動画/画像レクチャー環境） */
@@ -979,20 +1035,33 @@ function runAgent(t){
   const plan=getPlan();
   if(getUsage()>=limitFor(plan)){openUpsell();return;}
   if(plan!=="premium")setUsage(getUsage()+1);
-  openOutput(t);
+  openRun(t);
 }
-function openOutput(t){
-  const io=IO[t.id]||{in:"入力",out:"成果物"};
-  const sample=`【${t.name}】出力サンプル（プロトタイプ）\n\n― ${io.out} ―\n\n※ これはサンプルです。本番では、あなたが渡した入力（${io.in}）に応じて実際の成果物が生成されます。`;
-  openModal(`🤖 ${t.agent.name} を実行`,`入力を渡すと成果物が返ります（下はサンプル出力）。`,
-    `<div class="output" id="outText"></div>
-     <div style="display:flex;gap:10px;margin-top:14px">
-       <button class="btn get" id="copyOut" style="flex:1">コピーする</button>
+function outputActions(getText,filename){
+  return `<div id="runActs" style="display:none;gap:10px;margin-top:12px">
+       <button class="btn get" id="copyOut" style="flex:1">コピー</button>
        <button class="btn use" id="dlOut" style="flex:1;margin-top:0">ダウンロード</button>
-     </div>`);
-  $("#outText").textContent=sample;
-  const cp=$("#copyOut");if(cp)cp.onclick=async()=>{try{await navigator.clipboard.writeText(sample);toast("コピーしました");}catch(e){toast("コピーは本番環境で可能です","📋");}};
-  const dl=$("#dlOut");if(dl)dl.onclick=()=>toast("ダウンロードは本番で提供されます","⬇️");
+     </div>`;
+}
+function wireOutputActions(getText,filename){
+  const acts=$("#runActs");if(acts)acts.style.display="flex";
+  const cp=$("#copyOut");if(cp)cp.onclick=async()=>{try{await navigator.clipboard.writeText(getText());toast("コピーしました");}catch(e){toast("コピーは公開URLで可能です","📋");}};
+  const dl=$("#dlOut");if(dl)dl.onclick=()=>downloadText(filename,getText());
+}
+function openRun(t){
+  const io=IO[t.id]||{in:"入力",out:"成果物"};const conn=apiConnected();
+  openModal(`🤖 ${t.agent.name} を実行`,conn?"本番APIに接続して実行します。":"未接続のためサンプル出力を表示します（設定でAPIを繋ぐと本物が動きます）。",
+    `<div class="reqfield"><label>入力（${io.in}）</label><textarea id="runIn" placeholder="ここに入力を貼り付け／入力してください"></textarea></div>
+     <button class="btn get" id="runGo">${conn?"実行する":"サンプルを表示"}</button>
+     <div class="output" id="outText" style="margin-top:14px;display:none"></div>
+     ${outputActions()}`);
+  $("#runGo").onclick=async()=>{
+    const input=($("#runIn").value||"").trim();const out=$("#outText");out.style.display="block";
+    let text;
+    if(conn){text=await callAgentApi(`/v1/agents/${t.id}/run`,{input},out);}
+    else{text=`【${t.name}】出力サンプル（プロトタイプ）\n\n― ${io.out} ―\n\n入力: ${input||"（未入力）"}\n\n※ 未接続のためサンプルです。設定でAPIを繋ぐと実際の成果物が生成されます。`;out.textContent=text;}
+    if(text)wireOutputActions(()=>out.textContent,`${t.name}.txt`);
+  };
 }
 function openUpsell(){
   const plan=getPlan();const lim=limitFor(plan);
@@ -1135,13 +1204,20 @@ function renderReview(){
 }
 
 function openSettings(){
-  const admin=isAdmin();
-  openModal("⚙ 設定","アカウントと表示の設定（プロトタイプ）。",
+  const admin=isAdmin();const base=getApiBase();
+  openModal("⚙ 設定","アカウントと接続の設定（プロトタイプ）。",
     `<div class="reqfield"><label>🔑 管理者モード（デモ）</label>
-       <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">承認キュー（下書きの公開承認）は<b>管理者アカウントのみ</b>表示されます。本番はサーバー側の認可で判定します。</div>
+       <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">承認キューは<b>管理者アカウントのみ</b>表示。本番はサーバー側の認可で判定します。</div>
        <button class="btn ${admin?'have':'get'}" id="adminToggle">${admin?'✓ 管理者モード ON（メンバーに戻す）':'管理者モードにする'}</button>
-     </div>`);
+     </div>
+     <div class="reqfield" style="margin-top:18px"><label>🔌 APIのURL（本番接続）</label>
+       <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">設定すると「使う」「ワークフロー実行」が<b>本物のAPI</b>を呼びます。空なら<b>サンプル</b>で動作。</div>
+       <input id="apiBase" placeholder="https://your-api.example.com" value="${(base||'').replace(/"/g,'&quot;')}"></div>
+     <div class="reqfield"><label>APIキー（任意）</label><input id="apiKey" placeholder="pk_..." value="${(getApiKey()||'').replace(/"/g,'&quot;')}"></div>
+     <button class="btn get" id="apiSave">接続設定を保存</button>
+     <div style="font-size:11.5px;color:var(--faint);margin-top:8px">状態: ${base?'🟢 接続設定あり（本物のAPIを呼びます）':'⚪ 未接続（サンプル出力）'}</div>`);
   const b=$("#adminToggle");if(b)b.onclick=()=>{setRole(admin?"member":"admin");$("#mscrim").classList.remove("on");toast(admin?"メンバーに戻しました":"管理者モードにしました","🔑");if(!isAdmin()&&state.route==="review")state.route="library";renderAll();};
+  const sv=$("#apiSave");if(sv)sv.onclick=()=>{localStorage.setItem(API_BASE_KEY,($("#apiBase").value||'').trim());localStorage.setItem(API_KEY_KEY,($("#apiKey").value||'').trim());$("#mscrim").classList.remove("on");toast(getApiBase()?"APIに接続する設定を保存しました":"未接続（サンプル）に戻しました","🔌");renderAll();};
 }
 $("#diagBtn").onclick=openDiag;
 $("#planChip").onclick=()=>{state.route="plans";renderAll();window.scrollTo(0,0);};
