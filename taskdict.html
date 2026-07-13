@@ -415,8 +415,8 @@ const TAGMAP={
   t23:["調査・分析","要約"], t24:["企画"], t25:["文章作成","要約"], t26:["要約","リスト作成"],
   t27:["リスト作成","企画"], t28:["チェック・レビュー","対応・返信"], t29:["文章作成"], t30:["調査・分析"],
 };
-const tagsOf=id=>TAGMAP[id]||[];
-const tagCount=tag=>TASKS.filter(t=>tagsOf(t.id).includes(tag)).length;
+const tagsOf=id=>TAGMAP[id]||((getPublished().find(p=>p.id===id)||{}).tags)||[];
+const tagCount=tag=>ALLTASKS().filter(t=>tagsOf(t.id).includes(tag)).length;
 
 /* パーソナライズ: 業界・職種で辞書を最適化。職種→おすすめ業務カテゴリに対応。 */
 const INDUSTRIES=["IT・ソフトウェア","建設・不動産","製造","小売・EC","医療・介護","士業・コンサル","教育","飲食・サービス","その他"];
@@ -502,8 +502,8 @@ const hasProfile=()=>{const p=getProfile();return!!(p.industry||p.role||(p.tags&
 function recommended(){
   const p=getProfile();let list=[];
   const r=roleOf(p.role);
-  if(r&&r.cat!=="all")list=TASKS.filter(t=>t.cat===r.cat&&t.agent);
-  if(p.tags&&p.tags.length){const byTag=TASKS.filter(t=>t.agent&&tagsOf(t.id).some(g=>p.tags.includes(g)));list=list.concat(byTag);}
+  if(r&&r.cat!=="all")list=ALLTASKS().filter(t=>t.cat===r.cat&&t.agent);
+  if(p.tags&&p.tags.length){const byTag=ALLTASKS().filter(t=>t.agent&&tagsOf(t.id).some(g=>p.tags.includes(g)));list=list.concat(byTag);}
   const seen=new Set();const uniq=[];list.forEach(t=>{if(!seen.has(t.id)){seen.add(t.id);uniq.push(t);}});
   return uniq.slice(0,6);
 }
@@ -518,6 +518,21 @@ const SEED_DRAFTS=[
 const getDrafts=()=>{try{const s=localStorage.getItem(DRAFTS_KEY);return s?JSON.parse(s):SEED_DRAFTS.map(d=>({...d,status:"draft"}));}catch(e){return SEED_DRAFTS.map(d=>({...d,status:"draft"}));}};
 const saveDrafts=d=>localStorage.setItem(DRAFTS_KEY,JSON.stringify(d));
 const pendingDrafts=()=>getDrafts().filter(d=>d.status==="draft").length;
+/* 承認で公開されたエージェント（辞書に動的追加。本番はDB）。 */
+const PUBLISHED_KEY="task-published-v1";
+const getPublished=()=>{try{return JSON.parse(localStorage.getItem(PUBLISHED_KEY))||[];}catch(e){return[];}};
+const savePublished=a=>localStorage.setItem(PUBLISHED_KEY,JSON.stringify(a));
+function publishDraft(d){
+  const pub=getPublished();
+  if(pub.some(p=>p.id==="p"+d.id))return;
+  pub.unshift({id:"p"+d.id,cat:d.cat||"SP01",code:"NEW",mid:"承認公開エージェント",name:d.name,status:"ready",fresh:false,published:true,
+    agent:{name:d.name.replace(/エージェント$/,"")+"エージェント",tag:`${d.inSpec||"入力"} → ${d.outSpec||"成果物"}`,desc:d.prompt||"承認・公開されたエージェント。"},
+    io:{in:d.inSpec||"入力",out:d.outSpec||"成果物"},tags:d.tags||[]});
+  savePublished(pub);
+}
+const ALLTASKS=()=>TASKS.concat(getPublished());
+const taskById=id=>ALLTASKS().find(t=>t.id===id);
+const ioOf=t=>t.io||IO[t.id]||null;
 /* アカウント権限: 承認キューは管理者のみ。本番はサーバー側の認可で判定。 */
 const ROLE_KEY="task-role-v1";
 const getRole=()=>localStorage.getItem(ROLE_KEY)||"member";
@@ -595,7 +610,7 @@ const saveViewed=()=>localStorage.setItem(SKEY,JSON.stringify([...viewed]));
 
 let tt;function toast(m,em="✓"){let t=$("#toast");if(!t){t=el("div","toast");t.id="toast";document.body.appendChild(t);}t.innerHTML=`<span class="em">${em}</span><span>${m}</span>`;requestAnimationFrame(()=>t.classList.add("show"));clearTimeout(tt);tt=setTimeout(()=>t.classList.remove("show"),2900);}
 
-function filtered(){let l=TASKS.filter(t=>state.cat==="all"||t.cat===state.cat);if(state.tag){l=l.filter(t=>tagsOf(t.id).includes(state.tag));}if(state.q){const q=state.q.toLowerCase();l=l.filter(t=>t.name.toLowerCase().includes(q)||t.code.toLowerCase().includes(q)||t.mid.toLowerCase().includes(q)||(t.agent&&t.agent.name.toLowerCase().includes(q))||tagsOf(t.id).some(g=>g.includes(q)));}return l;}
+function filtered(){let l=ALLTASKS().filter(t=>state.cat==="all"||t.cat===state.cat);if(state.tag){l=l.filter(t=>tagsOf(t.id).includes(state.tag));}if(state.q){const q=state.q.toLowerCase();l=l.filter(t=>t.name.toLowerCase().includes(q)||t.code.toLowerCase().includes(q)||t.mid.toLowerCase().includes(q)||(t.agent&&t.agent.name.toLowerCase().includes(q))||tagsOf(t.id).some(g=>g.includes(q)));}return l;}
 
 function renderSide(){
   const nav=$("#side");nav.innerHTML="";
@@ -606,7 +621,7 @@ function renderSide(){
   gg.appendChild(sb);nav.appendChild(gg);
   const g=el("div","grp");g.appendChild(el("div","ttl","業務カテゴリ（大分類）"));
   CATS.forEach(c=>{
-    const n=c.code==="all"?TASKS.length:TASKS.filter(t=>t.cat===c.code).length;
+    const n=c.code==="all"?ALLTASKS().length:ALLTASKS().filter(t=>t.cat===c.code).length;
     const b=el("button","navitem"+(state.cat===c.code&&state.route==="library"?" active":""));
     b.innerHTML=`<span class="ic">${c.icon}</span><span>${c.label}${c.code!=="all"?` <span class="code">${c.code}</span>`:""}</span><span class="ct tnum">${n}</span>`;
     b.onclick=()=>{state.cat=c.code;state.route="library";state.q="";state.tag=null;renderAll();window.scrollTo(0,0);};
@@ -751,7 +766,7 @@ function renderAside(){
   const p1=el("div","panel");p1.innerHTML=`<h3>🔔 お知らせ</h3>`;
   [["NEW","契約レビューAIを新たに公開しました"],["更新","SNS投稿ジェネレーターに新鮮情報を追加"],["運営","毎日、各業務の最新AI情報を更新中"]].forEach(([tag,txt])=>p1.insertAdjacentHTML("beforeend",`<div class="notice"><span class="tag">${tag}</span><span>${txt}</span></div>`));
   aside.appendChild(p1);
-  const mine=TASKS.filter(t=>owned.has(t.id));
+  const mine=ALLTASKS().filter(t=>owned.has(t.id));
   const p2=el("div","panel");p2.innerHTML=`<h3>🤖 マイエージェント</h3>`;
   if(mine.length===0){p2.insertAdjacentHTML("beforeend",`<div style="font-size:12.5px;color:var(--faint)">業務タスクを開いて「受け取る」を押すと、ここに貯まります。</div>`);}
   else{const mp=el("div","mini");mine.slice(0,4).forEach(t=>{const c=catOf(t.cat);const r=el("div","row");r.innerHTML=`<div class="ico" style="background:${c.grad}">🤖</div><div><div class="t">${t.agent.name}</div><div class="s">${t.name}</div></div>`;r.style.cursor="pointer";r.onclick=()=>{state.route="detail";state.taskId=t.id;renderAll();window.scrollTo(0,0);};mp.appendChild(r);});p2.appendChild(mp);}
@@ -764,7 +779,7 @@ function renderAside(){
 
 /* detail */
 function renderDetail(){
-  const t=TASKS.find(x=>x.id===state.taskId);const c=catOf(t.cat);const has=t.agent&&owned.has(t.id);
+  const t=taskById(state.taskId);if(!t){state.route="library";return renderLibrary();}const c=catOf(t.cat);const has=t.agent&&owned.has(t.id);
   const v=$("#view");v.innerHTML="";
   const wrap=el("div","detail");
   const back=el("button","backbtn","← 業務辞書に戻る");back.onclick=()=>{state.route="library";renderAll();window.scrollTo(0,0);};
@@ -777,7 +792,7 @@ function renderDetail(){
   const dg=el("div","dgrid");
   const left=el("div");
   left.appendChild(el("div","dsec",`<div class="lb">この業務でできること</div><p>${t.name}を、AIエージェントに任せて短時間で仕上げます。入力を渡すだけで、下書き・整形・チェックまでを自動化。学ぶのではなく「すぐ使える」を実現します。</p>`));
-  const io=IO[t.id];
+  const io=ioOf(t);
   if(io){left.appendChild(el("div","dsec",`<div class="lb">エージェント定義（入力 → 出力）${t.status==="build"?" ・ 作成時の想定仕様":""}</div>
     <div class="iorow"><div class="iocell"><div class="ioh">入力</div><div class="iov">${io.in}</div></div>
     <div class="ioarrow">→</div>
@@ -818,7 +833,7 @@ function renderMine(){
   const v=$("#view");v.innerHTML="";
   v.appendChild(el("div","crumb",`<b>マイページ</b> / マイエージェント`));
   const head=el("div","libhead");head.innerHTML=`<h1><span>🤖</span> マイエージェント</h1>`;
-  const mine=TASKS.filter(t=>owned.has(t.id));
+  const mine=ALLTASKS().filter(t=>owned.has(t.id));
   head.appendChild(el("span","count",`${mine.length} 個`));v.appendChild(head);
   v.appendChild(el("p","libsub","受け取り済みのエージェント。各業務ですぐ使えます。"));
   if(mine.length===0){v.appendChild(el("div","empty",`<div class="big">🤖</div>まだ受け取ったエージェントはありません。<br>業務辞書からタスクを開いて「受け取る」を押してください。`));return;}
@@ -965,13 +980,13 @@ function renderLesson(){
 function newsRelevant(n){
   if(!hasProfile())return false;
   const p=getProfile();const r=roleOf(p.role);const cat=r&&r.cat!=="all"?r.cat:null;
-  return (n.tasks||[]).some(id=>{const t=TASKS.find(x=>x.id===id);if(!t)return false;
+  return (n.tasks||[]).some(id=>{const t=taskById(id);if(!t)return false;
     return (cat&&t.cat===cat)||((p.tags&&p.tags.length)&&tagsOf(id).some(g=>p.tags.includes(g)));});
 }
 function newsCard(n){
   const c=catOf(n.cat)||catOf("all");const isNew=n.id===justPushed;const rel=newsRelevant(n);
   const card=el("div","news"+(isNew?" isnew":""));
-  const tags=(n.tasks||[]).map(id=>{const t=TASKS.find(x=>x.id===id);return t?`<button class="ntag" data-task="${id}">${t.name}</button>`:"";}).join("");
+  const tags=(n.tasks||[]).map(id=>{const t=taskById(id);return t?`<button class="ntag" data-task="${id}">${t.name}</button>`:"";}).join("");
   card.innerHTML=`
     <div class="nico" style="background:${c.grad}">${c.icon}</div>
     <div class="nbody">
@@ -1049,7 +1064,7 @@ function wireOutputActions(getText,filename){
   const dl=$("#dlOut");if(dl)dl.onclick=()=>downloadText(filename,getText());
 }
 function openRun(t){
-  const io=IO[t.id]||{in:"入力",out:"成果物"};const conn=apiConnected();
+  const io=ioOf(t)||{in:"入力",out:"成果物"};const conn=apiConnected();
   openModal(`🤖 ${t.agent.name} を実行`,conn?"本番APIに接続して実行します。":"未接続のためサンプル出力を表示します（設定でAPIを繋ぐと本物が動きます）。",
     `<div class="reqfield"><label>入力（${io.in}）</label><textarea id="runIn" placeholder="ここに入力を貼り付け／入力してください"></textarea></div>
      <button class="btn get" id="runGo">${conn?"実行する":"サンプルを表示"}</button>
@@ -1197,7 +1212,7 @@ function renderReview(){
       <div class="qdef"><b>入力</b> ${d.inSpec} → <b>出力</b> ${d.outSpec}<br><b>プロンプト概要</b> ${d.prompt}</div>
       <div class="qdef" style="background:#fff"><b>サンプル出力</b><br>${d.sample}</div>`;
     const acts=el("div","qacts");
-    const ok=el("button","qbtn ok","承認して公開");ok.onclick=()=>{const all=getDrafts();const x=all.find(z=>z.id===d.id);if(x)x.status="approved";saveDrafts(all);toast(`「${d.name}」を公開しました`,"✅");renderAll();};
+    const ok=el("button","qbtn ok","承認して公開");ok.onclick=()=>{const all=getDrafts();const x=all.find(z=>z.id===d.id);if(x)x.status="approved";saveDrafts(all);publishDraft(d);toast(`「${d.name}」を辞書に公開しました（使える状態に）`,"✅");renderAll();};
     const ng=el("button","qbtn ng","差し戻し");ng.onclick=()=>{const all=getDrafts();const x=all.find(z=>z.id===d.id);if(x)x.status="rejected";saveDrafts(all);toast("差し戻しました");renderAll();};
     acts.append(ok,ng);it.appendChild(acts);v.appendChild(it);
   });
@@ -1224,7 +1239,7 @@ $("#planChip").onclick=()=>{state.route="plans";renderAll();window.scrollTo(0,0)
 $("#segLib").onclick=()=>{state.route="library";renderAll();};
 $("#segMine").onclick=()=>{state.route="mine";renderAll();};
 
-const myCount=()=>[...owned].filter(id=>TASKS.find(t=>t.id===id&&t.agent)).length;
+const myCount=()=>[...owned].filter(id=>{const t=taskById(id);return t&&t.agent;}).length;
 function renderAll(){
   if(state.route!=="news")stopNewsFeed();
   updatePlanChip();
