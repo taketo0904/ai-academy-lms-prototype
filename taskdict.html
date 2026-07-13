@@ -518,6 +518,11 @@ const SEED_DRAFTS=[
 const getDrafts=()=>{try{const s=localStorage.getItem(DRAFTS_KEY);return s?JSON.parse(s):SEED_DRAFTS.map(d=>({...d,status:"draft"}));}catch(e){return SEED_DRAFTS.map(d=>({...d,status:"draft"}));}};
 const saveDrafts=d=>localStorage.setItem(DRAFTS_KEY,JSON.stringify(d));
 const pendingDrafts=()=>getDrafts().filter(d=>d.status==="draft").length;
+/* アカウント権限: 承認キューは管理者のみ。本番はサーバー側の認可で判定。 */
+const ROLE_KEY="task-role-v1";
+const getRole=()=>localStorage.getItem(ROLE_KEY)||"member";
+const setRole=r=>localStorage.setItem(ROLE_KEY,r);
+const isAdmin=()=>getRole()==="admin";
 const catOf=code=>CATS.find(c=>c.code===code);
 let state={cat:"all",view:"grid",q:"",route:"library",taskId:null,level:"beg",lessonId:null,flowId:null,tag:null};
 let liveNews=NEWS.map(n=>({...n})),newsTimer=null,extraIdx=0,justPushed=null;
@@ -587,10 +592,12 @@ function renderSide(){
   fb.innerHTML=`<span class="ic">🔗</span><span>連携ワークフロー</span><span class="ct tnum">${WORKFLOWS.length}</span>`;
   fb.onclick=()=>{state.route="flows";renderAll();window.scrollTo(0,0);};
   gn.appendChild(fb);
-  const rvb=el("button","navitem"+(state.route==="review"?" active":""));
-  rvb.innerHTML=`<span class="ic">📥</span><span>承認キュー</span>`+(pendingDrafts()?`<span class="ct tnum">${pendingDrafts()}</span>`:``);
-  rvb.onclick=()=>{state.route="review";renderAll();window.scrollTo(0,0);};
-  gn.appendChild(rvb);
+  if(isAdmin()){
+    const rvb=el("button","navitem"+(state.route==="review"?" active":""));
+    rvb.innerHTML=`<span class="ic">📥</span><span>承認キュー</span><span class="newtag" style="background:var(--ink)">管理</span>`+(pendingDrafts()?`<span class="ct tnum">${pendingDrafts()}</span>`:``);
+    rvb.onclick=()=>{state.route="review";renderAll();window.scrollTo(0,0);};
+    gn.appendChild(rvb);
+  }
   nav.appendChild(gn);
   const g2=el("div","grp");g2.appendChild(el("div","ttl","マイページ"));
   const mb=el("button","navitem"+(state.route==="mine"?" active":""));
@@ -609,7 +616,7 @@ function renderSide(){
   frb.innerHTML=`<span class="ic">🆓</span><span>無料会員ページ</span>`;
   frb.onclick=()=>{state.route="free";renderAll();window.scrollTo(0,0);};
   g2.appendChild(frb);
-  [["🧭","業務診断",()=>openDiag()],["♡","お気に入り",()=>toast("プロトタイプでは未実装です")],["⚙","設定",()=>toast("プロトタイプでは未実装です")]].forEach(([ic,lb,fn])=>{
+  [["🧭","業務診断",()=>openDiag()],["♡","お気に入り",()=>toast("プロトタイプでは未実装です")],["⚙","設定",()=>openSettings()]].forEach(([ic,lb,fn])=>{
     const b=el("button","navitem");b.innerHTML=`<span class="ic">${ic}</span><span>${lb}</span>`;b.onclick=fn;g2.appendChild(b);
   });
   nav.appendChild(g2);
@@ -1100,6 +1107,7 @@ function openRequestForm(name,cat){
 function renderReview(){
   const v=$("#view");v.innerHTML="";
   v.appendChild(el("div","crumb",`<b>運営</b> / 承認キュー`));
+  if(!isAdmin()){v.appendChild(el("div","empty",`<div class="big">🔒</div>この画面は<b>管理者アカウント</b>のみアクセスできます。<br><span style="font-size:12px">（設定 ＞ 管理者モードで切替・デモ）</span>`));return;}
   const head=el("div","libhead");head.innerHTML=`<h1><span>📥</span> 承認キュー（下書き）</h1>`;
   head.appendChild(el("span","count",`承認待ち ${pendingDrafts()} 件`));v.appendChild(head);
   v.appendChild(el("p","libsub","検証AIを通過したエージェントの<b>下書き</b>です。内容を確認して<b>承認すると正式公開</b>されます（人間レビューが最終ゲート）。🌐外部情報からの自動生成分と、👤ユーザー依頼分が並びます。"));
@@ -1119,6 +1127,15 @@ function renderReview(){
   });
 }
 
+function openSettings(){
+  const admin=isAdmin();
+  openModal("⚙ 設定","アカウントと表示の設定（プロトタイプ）。",
+    `<div class="reqfield"><label>🔑 管理者モード（デモ）</label>
+       <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">承認キュー（下書きの公開承認）は<b>管理者アカウントのみ</b>表示されます。本番はサーバー側の認可で判定します。</div>
+       <button class="btn ${admin?'have':'get'}" id="adminToggle">${admin?'✓ 管理者モード ON（メンバーに戻す）':'管理者モードにする'}</button>
+     </div>`);
+  const b=$("#adminToggle");if(b)b.onclick=()=>{setRole(admin?"member":"admin");$("#mscrim").classList.remove("on");toast(admin?"メンバーに戻しました":"管理者モードにしました","🔑");if(!isAdmin()&&state.route==="review")state.route="library";renderAll();};
+}
 $("#diagBtn").onclick=openDiag;
 $("#planChip").onclick=()=>{state.route="plans";renderAll();window.scrollTo(0,0);};
 $("#segLib").onclick=()=>{state.route="library";renderAll();};
