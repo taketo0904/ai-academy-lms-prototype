@@ -233,6 +233,31 @@
   .ctag{font-size:10px;font-weight:700;color:var(--muted);background:var(--canvas);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
   .dtag{font-size:11.5px;font-weight:700;color:var(--accent-ink);background:var(--accent-wash);border:none;border-radius:20px;padding:5px 12px;cursor:pointer;margin-right:6px}
   .dtag:hover{background:#e0dcf7}
+  /* plan / usage / output */
+  .planchip{border:1px solid var(--line);background:#fff;border-radius:10px;padding:7px 12px;font-size:12px;font-weight:700;color:var(--slate);display:flex;align-items:center;gap:6px}
+  .planchip:hover{background:var(--canvas)}
+  .planchip.prem{background:linear-gradient(135deg,#5B4BE1,#8b7bf0);color:#fff;border:none}
+  .plans2{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:720px}
+  @media(max-width:640px){.plans2{grid-template-columns:1fr}}
+  .plan{background:var(--surface);border:1px solid var(--line-strong);border-radius:16px;padding:22px;box-shadow:var(--shadow);position:relative}
+  .plan.cur{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-wash)}
+  .plan.prem{background:linear-gradient(135deg,#141A2E,#2a2350);color:#fff;border:none}
+  .plan .pname{font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px}
+  .plan .price{font-size:28px;font-weight:800;margin:8px 0 2px;font-variant-numeric:tabular-nums}
+  .plan .price small{font-size:13px;font-weight:600;color:var(--faint)}
+  .plan.prem .price small{color:rgba(255,255,255,.6)}
+  .plan ul{margin:14px 0;padding-left:0;list-style:none}
+  .plan li{font-size:13px;padding:5px 0;display:flex;gap:8px;line-height:1.5}
+  .plan li:before{content:"✓";color:var(--green);font-weight:800;flex-shrink:0}
+  .plan.prem li:before{color:#7ee0b0}
+  .plan .curbadge{position:absolute;top:14px;right:14px;font-size:10.5px;font-weight:800;background:var(--accent-wash);color:var(--accent-ink);padding:3px 9px;border-radius:20px}
+  .planbtn{width:100%;border:none;border-radius:10px;font-size:13.5px;font-weight:800;padding:12px;margin-top:6px}
+  .planbtn.up{background:var(--accent);color:#fff}
+  .planbtn.up:hover{background:var(--accent-ink)}
+  .plan.prem .planbtn.up{background:#fff;color:var(--accent-ink)}
+  .planbtn.cur{background:var(--canvas);color:var(--muted);cursor:default}
+  .plan.prem .planbtn.cur{background:rgba(255,255,255,.15);color:rgba(255,255,255,.7)}
+  .output{background:var(--canvas);border:1px solid var(--line);border-radius:10px;padding:14px;font-size:13px;line-height:1.7;white-space:pre-wrap;color:var(--ink);max-height:300px;overflow:auto}
 
   /* news feed */
   .newshead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
@@ -266,6 +291,7 @@
     <button id="segMine">マイエージェント</button>
   </div>
   <div class="spacer"></div>
+  <button class="planchip" id="planChip"></button>
   <button class="icobtn" id="diagBtn" title="業務診断">🧭</button>
   <button class="icobtn" title="お知らせ">🔔<span class="badge">3</span></button>
   <div class="avatar">中川</div>
@@ -430,6 +456,12 @@ const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=nu
 const OKEY="task-agents-owned-v2";
 let owned=new Set(JSON.parse(localStorage.getItem(OKEY)||"[]"));
 const saveOwned=()=>localStorage.setItem(OKEY,JSON.stringify([...owned]));
+/* 料金プラン・利用回数（フロントで完結。本番はサーバー側の課金判定に置換） */
+const PLAN_KEY="task-plan-v1",USAGE_KEY="task-usage-v1",STD_LIMIT=5;
+const getPlan=()=>localStorage.getItem(PLAN_KEY)||"standard";
+const setPlan=p=>{localStorage.setItem(PLAN_KEY,p);updatePlanChip();};
+const getUsage=()=>parseInt(localStorage.getItem(USAGE_KEY)||"0",10);
+const setUsage=n=>{localStorage.setItem(USAGE_KEY,String(n));updatePlanChip();};
 const catOf=code=>CATS.find(c=>c.code===code);
 let state={cat:"all",view:"grid",q:"",route:"library",taskId:null,level:"beg",lessonId:null,flowId:null,tag:null};
 let liveNews=NEWS.map(n=>({...n})),newsTimer=null,extraIdx=0,justPushed=null;
@@ -505,6 +537,10 @@ function renderSide(){
   mb.innerHTML=`<span class="ic">🤖</span><span>マイエージェント</span>`+(myCount()?`<span class="ct tnum">${myCount()}</span>`:`<span class="newtag">NEW</span>`);
   mb.onclick=()=>{state.route="mine";renderAll();window.scrollTo(0,0);};
   g2.appendChild(mb);
+  const plb=el("button","navitem"+(state.route==="plans"?" active":""));
+  plb.innerHTML=`<span class="ic">💳</span><span>料金プラン</span>`;
+  plb.onclick=()=>{state.route="plans";renderAll();window.scrollTo(0,0);};
+  g2.appendChild(plb);
   [["🧭","業務診断",()=>openDiag()],["♡","お気に入り",()=>toast("プロトタイプでは未実装です")],["⚙","設定",()=>toast("プロトタイプでは未実装です")]].forEach(([ic,lb,fn])=>{
     const b=el("button","navitem");b.innerHTML=`<span class="ic">${ic}</span><span>${lb}</span>`;b.onclick=fn;g2.appendChild(b);
   });
@@ -651,7 +687,7 @@ function renderDetail(){
     else{box.insertAdjacentHTML("beforeend",`<button class="btn get" data-get="1">＋ このエージェントを受け取る</button>`);}
     right.appendChild(box);
     const g=box.querySelector('[data-get]');if(g)g.onclick=()=>{owned.add(t.id);saveOwned();toast(`「${t.agent.name}」を受け取りました`,"🎉");renderAll();};
-    const u=box.querySelector('[data-use]');if(u)u.onclick=()=>toast(`「${t.agent.name}」を起動します（プロトタイプ）`,"🤖");
+    const u=box.querySelector('[data-use]');if(u)u.onclick=()=>runAgent(t);
   }else{
     const box=el("div","buildbox");
     box.innerHTML=`<div class="bh">🛠️ 専用エージェント未整備</div><p>この業務のエージェントはまだありません。リクエストいただければ<b>1日以内に作成</b>してマイエージェントに追加します。</p><button class="btn req" data-req="1">この業務のエージェントを作ってもらう</button>`;
@@ -847,13 +883,66 @@ function openModal(title,sub,inner){
   let m=$("#mscrim");if(!m){m=el("div","mscrim");m.id="mscrim";document.body.appendChild(m);m.onclick=e=>{if(e.target===m)m.classList.remove("on");};}
   m.innerHTML=`<div class="modal"><h3>${title}</h3><p class="msub">${sub}</p>${inner}</div>`;requestAnimationFrame(()=>m.classList.add("on"));
 }
+/* エージェント実行（利用回数・上限・成果物プレビュー） */
+function runAgent(t){
+  if(getPlan()==="standard"&&getUsage()>=STD_LIMIT){openUpsell();return;}
+  if(getPlan()==="standard")setUsage(getUsage()+1);
+  openOutput(t);
+}
+function openOutput(t){
+  const io=IO[t.id]||{in:"入力",out:"成果物"};
+  const sample=`【${t.name}】出力サンプル（プロトタイプ）\n\n― ${io.out} ―\n\n※ これはサンプルです。本番では、あなたが渡した入力（${io.in}）に応じて実際の成果物が生成されます。`;
+  openModal(`🤖 ${t.agent.name} を実行`,`入力を渡すと成果物が返ります（下はサンプル出力）。`,
+    `<div class="output" id="outText"></div>
+     <div style="display:flex;gap:10px;margin-top:14px">
+       <button class="btn get" id="copyOut" style="flex:1">コピーする</button>
+       <button class="btn use" id="dlOut" style="flex:1;margin-top:0">ダウンロード</button>
+     </div>`);
+  $("#outText").textContent=sample;
+  const cp=$("#copyOut");if(cp)cp.onclick=async()=>{try{await navigator.clipboard.writeText(sample);toast("コピーしました");}catch(e){toast("コピーは本番環境で可能です","📋");}};
+  const dl=$("#dlOut");if(dl)dl.onclick=()=>toast("ダウンロードは本番で提供されます","⬇️");
+}
+function openUpsell(){
+  openModal("⬆️ 今月の上限に達しました",`標準プランの上限（月${STD_LIMIT}本）に達しました。プレミアムなら回数無制限で使えます。`,
+    `<button class="btn get" id="upBtn">プレミアムにアップグレード（月9,800円）</button>`);
+  const b=$("#upBtn");if(b)b.onclick=()=>{setPlan("premium");$("#mscrim").classList.remove("on");toast("プレミアムにアップグレードしました","💎");renderAll();};
+}
+function updatePlanChip(){
+  const chip=$("#planChip");if(!chip)return;
+  if(getPlan()==="premium"){chip.className="planchip prem";chip.innerHTML="💎 プレミアム ・ 無制限";}
+  else{chip.className="planchip";chip.innerHTML=`💳 標準 ・ 今月 <span class="tnum">${getUsage()}/${STD_LIMIT}</span>本`;}
+}
+function renderPlans(){
+  const v=$("#view");v.innerHTML="";
+  const cur=getPlan();
+  v.appendChild(el("div","crumb",`<b>マイページ</b> / 料金プラン`));
+  const head=el("div","libhead");head.innerHTML=`<h1><span>💳</span> 料金プラン</h1>`;v.appendChild(head);
+  v.appendChild(el("p","libsub",`忘れられる金額で継続。標準は機能制限つき、プレミアムは全機能・回数無制限。<b>現在のプラン: ${cur==="premium"?"プレミアム":"標準"}</b>`));
+  const grid=el("div","plans2");
+  const std=el("div","plan"+(cur==="standard"?" cur":""));
+  std.innerHTML=`${cur==="standard"?'<span class="curbadge">現在のプラン</span>':''}<div class="pname">💳 標準プラン</div><div class="price">¥4,980<small>/月</small></div><ul><li>業務エージェント辞書・検索・タグ横断</li><li>時事ニュース（鮮度情報）</li><li>使い方レクチャー</li><li>利用 月${STD_LIMIT}本まで／DL上限あり</li></ul>`;
+  const sbtn=el("button","planbtn "+(cur==="standard"?"cur":"up"),cur==="standard"?"利用中":"標準に変更");
+  if(cur!=="standard")sbtn.onclick=()=>{setPlan("standard");renderPlans();toast("標準プランに変更しました");};
+  std.appendChild(sbtn);grid.appendChild(std);
+  const prem=el("div","plan prem"+(cur==="premium"?" cur":""));
+  prem.innerHTML=`${cur==="premium"?'<span class="curbadge" style="background:rgba(255,255,255,.2);color:#fff">現在のプラン</span>':''}<div class="pname">💎 プレミアムプラン</div><div class="price">¥9,800<small>/月</small></div><ul><li>全機能を利用可能</li><li>エージェント利用・DL 無制限</li><li>連携ワークフロー フル</li><li>新鮮情報・パーソナライズ フル</li></ul>`;
+  const pbtn=el("button","planbtn "+(cur==="premium"?"cur":"up"),cur==="premium"?"利用中":"プレミアムにアップグレード");
+  if(cur!=="premium")pbtn.onclick=()=>{setPlan("premium");renderPlans();toast("プレミアムにアップグレードしました","💎");};
+  prem.appendChild(pbtn);grid.appendChild(prem);
+  v.appendChild(grid);
+  const reset=el("button","tagclear","（デモ）今月の利用回数をリセット");reset.style.cssText="margin-top:16px;margin-left:0";reset.onclick=()=>{setUsage(0);renderPlans();toast("利用回数をリセットしました");};
+  v.appendChild(reset);
+}
+
 $("#diagBtn").onclick=openDiag;
+$("#planChip").onclick=()=>{state.route="plans";renderAll();window.scrollTo(0,0);};
 $("#segLib").onclick=()=>{state.route="library";renderAll();};
 $("#segMine").onclick=()=>{state.route="mine";renderAll();};
 
 const myCount=()=>[...owned].filter(id=>TASKS.find(t=>t.id===id&&t.agent)).length;
 function renderAll(){
   if(state.route!=="news")stopNewsFeed();
+  updatePlanChip();
   renderSide();
   $("#segLib").classList.toggle("active",state.route==="library"||state.route==="detail");
   $("#segMine").classList.toggle("active",state.route==="mine");
@@ -864,6 +953,7 @@ function renderAll(){
   else if(state.route==="lesson")renderLesson();
   else if(state.route==="flows")renderFlows();
   else if(state.route==="flow")renderFlow();
+  else if(state.route==="plans")renderPlans();
   else renderLibrary();
 }
 $(".icobtn[title='お知らせ']").onclick=()=>{state.route="news";renderAll();window.scrollTo(0,0);};
