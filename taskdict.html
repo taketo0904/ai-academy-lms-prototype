@@ -261,6 +261,24 @@
   .pgroup{margin-bottom:22px;max-width:720px}
   .pgroup .pl{font-size:13px;font-weight:800;margin-bottom:10px;display:flex;align-items:center;gap:8px}
   .pchips{display:flex;gap:8px;flex-wrap:wrap}
+  /* request form / review queue */
+  .reqfield{margin-bottom:14px;text-align:left}
+  .reqfield label{display:block;font-size:12px;font-weight:800;color:var(--muted);margin-bottom:6px}
+  .reqfield input,.reqfield textarea{width:100%;border:1px solid var(--line-strong);border-radius:9px;padding:10px 12px;font-size:14px;font-family:inherit;color:var(--ink)}
+  .reqfield textarea{min-height:60px;resize:vertical}
+  .reqfield input:focus,.reqfield textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-wash)}
+  .qitem{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:var(--shadow);max-width:760px}
+  .qitem .qh{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:6px}
+  .qitem .qname{font-size:15px;font-weight:800}
+  .qsrc{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:6px}
+  .qsrc.user{background:var(--accent-wash);color:var(--accent-ink)}
+  .qsrc.auto{background:var(--violet-wash);color:var(--violet)}
+  .qpass{font-size:10.5px;font-weight:800;background:var(--green-wash);color:var(--green);padding:2px 8px;border-radius:6px}
+  .qdef{background:var(--canvas);border:1px solid var(--line);border-radius:10px;padding:11px 13px;font-size:12.5px;color:var(--slate);line-height:1.65;margin:8px 0}
+  .qacts{display:flex;gap:10px;margin-top:10px}
+  .qbtn{border:none;border-radius:9px;font-size:13px;font-weight:800;padding:9px 16px}
+  .qbtn.ok{background:var(--green);color:#fff}
+  .qbtn.ng{background:#fff;border:1px solid var(--line-strong);color:var(--muted)}
 
   /* news feed */
   .newshead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
@@ -489,6 +507,17 @@ function recommended(){
   const seen=new Set();const uniq=[];list.forEach(t=>{if(!seen.has(t.id)){seen.add(t.id);uniq.push(t);}});
   return uniq.slice(0,6);
 }
+
+/* 承認キュー: 検証AIを通過した「下書き」。入口A=ユーザー依頼／入口B=外部情報から自動生成。 */
+const DRAFTS_KEY="task-drafts-v1";
+const SEED_DRAFTS=[
+  {id:"d1",name:"採用の一次面接メモの要約",source:"auto",origin:"記事: AI面接支援の最新事例",cat:"SP02",inSpec:"面接メモ／録音",outSpec:"評価観点別の要約＋所見・次アクション",prompt:"面接メモから、評価観点（コミュニケーション/経験/カルチャー）別に要約し、所見と次アクションを出力する。",sample:"【一次面接 要約】コミュニケーション: 結論から明瞭／経験: 要件に合致／カルチャー: 前向き。所見: 二次面接を推奨。"},
+  {id:"d2",name:"問い合わせメールの一次返信案",source:"auto",origin:"事例: サポート自動化のPR TIMES",cat:"US03",inSpec:"受信した問い合わせメール",outSpec:"一次返信ドラフト（丁寧／簡潔の2案）",prompt:"問い合わせ内容を分類し、丁寧・簡潔の2トーンで一次返信案を作る。不明点は確認質問を添える。",sample:"【返信案（丁寧）】お問い合わせありがとうございます。ご不便をおかけし申し訳ありません。…"},
+  {id:"d3",name:"競合の新機能ウォッチ要約",source:"auto",origin:"記事: 競合Xの新機能発表",cat:"CM01",inSpec:"競合の発表URL／記事",outSpec:"新機能の要点＋自社への示唆3点",prompt:"競合の発表から新機能の要点を抽出し、自社プロダクトへの示唆を3点出す。",sample:"【競合ウォッチ】新機能: 〇〇。要点: …。示唆: ①… ②… ③…"},
+];
+const getDrafts=()=>{try{const s=localStorage.getItem(DRAFTS_KEY);return s?JSON.parse(s):SEED_DRAFTS.map(d=>({...d,status:"draft"}));}catch(e){return SEED_DRAFTS.map(d=>({...d,status:"draft"}));}};
+const saveDrafts=d=>localStorage.setItem(DRAFTS_KEY,JSON.stringify(d));
+const pendingDrafts=()=>getDrafts().filter(d=>d.status==="draft").length;
 const catOf=code=>CATS.find(c=>c.code===code);
 let state={cat:"all",view:"grid",q:"",route:"library",taskId:null,level:"beg",lessonId:null,flowId:null,tag:null};
 let liveNews=NEWS.map(n=>({...n})),newsTimer=null,extraIdx=0,justPushed=null;
@@ -558,6 +587,10 @@ function renderSide(){
   fb.innerHTML=`<span class="ic">🔗</span><span>連携ワークフロー</span><span class="ct tnum">${WORKFLOWS.length}</span>`;
   fb.onclick=()=>{state.route="flows";renderAll();window.scrollTo(0,0);};
   gn.appendChild(fb);
+  const rvb=el("button","navitem"+(state.route==="review"?" active":""));
+  rvb.innerHTML=`<span class="ic">📥</span><span>承認キュー</span>`+(pendingDrafts()?`<span class="ct tnum">${pendingDrafts()}</span>`:``);
+  rvb.onclick=()=>{state.route="review";renderAll();window.scrollTo(0,0);};
+  gn.appendChild(rvb);
   nav.appendChild(gn);
   const g2=el("div","grp");g2.appendChild(el("div","ttl","マイページ"));
   const mb=el("button","navitem"+(state.route==="mine"?" active":""));
@@ -736,7 +769,7 @@ function renderDetail(){
     const box=el("div","buildbox");
     box.innerHTML=`<div class="bh">🛠️ 専用エージェント未整備</div><p>この業務のエージェントはまだありません。リクエストいただければ<b>1日以内に作成</b>してマイエージェントに追加します。</p><button class="btn req" data-req="1">この業務のエージェントを作ってもらう</button>`;
     right.appendChild(box);
-    box.querySelector('[data-req]').onclick=()=>{toast(`「${t.name}」のエージェント作成を受け付けました（1日以内）`,"🛠️");};
+    box.querySelector('[data-req]').onclick=()=>openRequestForm(t.name,t.cat);
   }
   dg.appendChild(right);
   wrap.appendChild(dg);
@@ -1044,6 +1077,48 @@ function renderProfile(){
   act.appendChild(clr);v.appendChild(act);
 }
 
+/* 作成リクエストフォーム（入口A: ユーザー本人が依頼） */
+function openRequestForm(name,cat){
+  openModal("🛠️ エージェント作成をリクエスト","欲しい業務のエージェントを依頼します。生成→検証AIを通過すると、承認キューに下書きとして並びます。",
+    `<div class="reqfield"><label>業務名</label><input id="rqName" value="${(name||"").replace(/"/g,"&quot;")}"></div>
+     <div class="reqfield"><label>やりたいこと</label><textarea id="rqWant" placeholder="例: 検索結果から見込み客を、新規リードだけ抽出したい"></textarea></div>
+     <div class="reqfield"><label>入力の例</label><input id="rqIn" placeholder="例: 検索条件・既存の顧客台帳"></div>
+     <div class="reqfield"><label>欲しい出力の例（任意・精度が上がります）</label><textarea id="rqOut" placeholder="例: 会社名・担当・連絡先の一覧表"></textarea></div>
+     <button class="btn get" id="rqSubmit">リクエストを送信</button>`);
+  const s=$("#rqSubmit");if(s)s.onclick=()=>{
+    const nm=($("#rqName").value||"").trim()||"（無題の業務）";
+    const drafts=getDrafts();
+    drafts.unshift({id:"u"+getUsage()+"_"+nm.length+"_"+drafts.length,name:nm,source:"user",origin:"ユーザー依頼",cat:cat||"SP01",
+      inSpec:($("#rqIn").value||"").trim()||"—",outSpec:($("#rqOut").value||"").trim()||"（生成AIが定義）",
+      prompt:`${nm}を行うエージェント。依頼「${($("#rqWant").value||"").trim()||"（未記入）"}」に基づき、入力を受けて成果物を出力する。`,
+      sample:"（検証AIがサンプル出力を生成します）",status:"draft"});
+    saveDrafts(drafts);$("#mscrim").classList.remove("on");
+    toast("リクエストを送信しました。検証後、承認キューに並びます","🛠️");renderAll();
+  };
+}
+/* 承認キュー（下書き→人が承認で正式公開） */
+function renderReview(){
+  const v=$("#view");v.innerHTML="";
+  v.appendChild(el("div","crumb",`<b>運営</b> / 承認キュー`));
+  const head=el("div","libhead");head.innerHTML=`<h1><span>📥</span> 承認キュー（下書き）</h1>`;
+  head.appendChild(el("span","count",`承認待ち ${pendingDrafts()} 件`));v.appendChild(head);
+  v.appendChild(el("p","libsub","検証AIを通過したエージェントの<b>下書き</b>です。内容を確認して<b>承認すると正式公開</b>されます（人間レビューが最終ゲート）。🌐外部情報からの自動生成分と、👤ユーザー依頼分が並びます。"));
+  const pending=getDrafts().filter(d=>d.status==="draft");
+  if(pending.length===0){v.appendChild(el("div","empty",`<div class="big">✅</div>承認待ちの下書きはありません。`));return;}
+  pending.forEach(d=>{
+    const cat=catOf(d.cat)||catOf("all");
+    const it=el("div","qitem");
+    it.innerHTML=`<div class="qh"><span class="qname">${d.name}</span><span class="qsrc ${d.source}">${d.source==="auto"?"🌐 外部情報":"👤 ユーザー依頼"}</span><span class="qpass">✓ 検証AI通過</span></div>
+      <div style="font-size:11.5px;color:var(--faint)">由来: ${d.origin} ・ カテゴリ: ${cat.label}</div>
+      <div class="qdef"><b>入力</b> ${d.inSpec} → <b>出力</b> ${d.outSpec}<br><b>プロンプト概要</b> ${d.prompt}</div>
+      <div class="qdef" style="background:#fff"><b>サンプル出力</b><br>${d.sample}</div>`;
+    const acts=el("div","qacts");
+    const ok=el("button","qbtn ok","承認して公開");ok.onclick=()=>{const all=getDrafts();const x=all.find(z=>z.id===d.id);if(x)x.status="approved";saveDrafts(all);toast(`「${d.name}」を公開しました`,"✅");renderAll();};
+    const ng=el("button","qbtn ng","差し戻し");ng.onclick=()=>{const all=getDrafts();const x=all.find(z=>z.id===d.id);if(x)x.status="rejected";saveDrafts(all);toast("差し戻しました");renderAll();};
+    acts.append(ok,ng);it.appendChild(acts);v.appendChild(it);
+  });
+}
+
 $("#diagBtn").onclick=openDiag;
 $("#planChip").onclick=()=>{state.route="plans";renderAll();window.scrollTo(0,0);};
 $("#segLib").onclick=()=>{state.route="library";renderAll();};
@@ -1066,6 +1141,7 @@ function renderAll(){
   else if(state.route==="plans")renderPlans();
   else if(state.route==="profile")renderProfile();
   else if(state.route==="free")renderFree();
+  else if(state.route==="review")renderReview();
   else renderLibrary();
 }
 $(".icobtn[title='お知らせ']").onclick=()=>{state.route="news";renderAll();window.scrollTo(0,0);};
