@@ -258,6 +258,9 @@
   .planbtn.cur{background:var(--canvas);color:var(--muted);cursor:default}
   .plan.prem .planbtn.cur{background:rgba(255,255,255,.15);color:rgba(255,255,255,.7)}
   .output{background:var(--canvas);border:1px solid var(--line);border-radius:10px;padding:14px;font-size:13px;line-height:1.7;white-space:pre-wrap;color:var(--ink);max-height:300px;overflow:auto}
+  .pgroup{margin-bottom:22px;max-width:720px}
+  .pgroup .pl{font-size:13px;font-weight:800;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .pchips{display:flex;gap:8px;flex-wrap:wrap}
 
   /* news feed */
   .newshead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
@@ -397,6 +400,16 @@ const TAGMAP={
 const tagsOf=id=>TAGMAP[id]||[];
 const tagCount=tag=>TASKS.filter(t=>tagsOf(t.id).includes(tag)).length;
 
+/* パーソナライズ: 業界・職種で辞書を最適化。職種→おすすめ業務カテゴリに対応。 */
+const INDUSTRIES=["IT・ソフトウェア","建設・不動産","製造","小売・EC","医療・介護","士業・コンサル","教育","飲食・サービス","その他"];
+const ROLES=[
+  {key:"sales",label:"営業",cat:"SP01"},{key:"mkt",label:"マーケティング",cat:"CM01"},
+  {key:"admin",label:"経理・総務・人事",cat:"SP02"},{key:"data",label:"データ・分析",cat:"CM06"},
+  {key:"pm",label:"PM・進行管理",cat:"DV15"},{key:"ops",label:"情シス・運用",cat:"US03"},
+  {key:"mgr",label:"経営・その他",cat:"all"},
+];
+const roleOf=key=>ROLES.find(r=>r.key===key);
+
 /* 特化型エージェントの複数連携（万能1体でなく、タスク特化を直列につなぐ）。=「スキル図」。 */
 const S=(agent,inp,out,build)=>({agent,in:inp,out,build:!!build});
 const WORKFLOWS=[
@@ -462,6 +475,19 @@ const getPlan=()=>localStorage.getItem(PLAN_KEY)||"standard";
 const setPlan=p=>{localStorage.setItem(PLAN_KEY,p);updatePlanChip();};
 const getUsage=()=>parseInt(localStorage.getItem(USAGE_KEY)||"0",10);
 const setUsage=n=>{localStorage.setItem(USAGE_KEY,String(n));updatePlanChip();};
+const PROFILE_KEY="task-profile-v1";
+const getProfile=()=>{try{return JSON.parse(localStorage.getItem(PROFILE_KEY))||{industry:null,role:null,tags:[]};}catch(e){return{industry:null,role:null,tags:[]};}};
+const setProfile=p=>localStorage.setItem(PROFILE_KEY,JSON.stringify(p));
+const hasProfile=()=>{const p=getProfile();return!!(p.industry||p.role||(p.tags&&p.tags.length));};
+/* 職種→おすすめエージェント（使えるもの優先）＋関心タグ一致を加味 */
+function recommended(){
+  const p=getProfile();let list=[];
+  const r=roleOf(p.role);
+  if(r&&r.cat!=="all")list=TASKS.filter(t=>t.cat===r.cat&&t.agent);
+  if(p.tags&&p.tags.length){const byTag=TASKS.filter(t=>t.agent&&tagsOf(t.id).some(g=>p.tags.includes(g)));list=list.concat(byTag);}
+  const seen=new Set();const uniq=[];list.forEach(t=>{if(!seen.has(t.id)){seen.add(t.id);uniq.push(t);}});
+  return uniq.slice(0,6);
+}
 const catOf=code=>CATS.find(c=>c.code===code);
 let state={cat:"all",view:"grid",q:"",route:"library",taskId:null,level:"beg",lessonId:null,flowId:null,tag:null};
 let liveNews=NEWS.map(n=>({...n})),newsTimer=null,extraIdx=0,justPushed=null;
@@ -541,6 +567,10 @@ function renderSide(){
   plb.innerHTML=`<span class="ic">💳</span><span>料金プラン</span>`;
   plb.onclick=()=>{state.route="plans";renderAll();window.scrollTo(0,0);};
   g2.appendChild(plb);
+  const prf=el("button","navitem"+(state.route==="profile"?" active":""));
+  prf.innerHTML=`<span class="ic">🎯</span><span>パーソナライズ</span>`+(hasProfile()?`<span class="ct">設定済</span>`:`<span class="newtag">NEW</span>`);
+  prf.onclick=()=>{state.route="profile";renderAll();window.scrollTo(0,0);};
+  g2.appendChild(prf);
   [["🧭","業務診断",()=>openDiag()],["♡","お気に入り",()=>toast("プロトタイプでは未実装です")],["⚙","設定",()=>toast("プロトタイプでは未実装です")]].forEach(([ic,lb,fn])=>{
     const b=el("button","navitem");b.innerHTML=`<span class="ic">${ic}</span><span>${lb}</span>`;b.onclick=fn;g2.appendChild(b);
   });
@@ -582,6 +612,15 @@ function renderLibrary(){
 
   const wrap=el("div","contentgrid");
   const col=el("div");
+  if(state.cat==="all"&&!state.q&&!state.tag&&hasProfile()&&recommended().length){
+    const p=getProfile();const rl=roleOf(p.role);
+    const rb=el("div","newband");
+    rb.innerHTML=`<h4>🎯 あなたへのおすすめ</h4><p>${p.industry?p.industry+"・":""}${rl?rl.label:"あなた"}の業務に合わせたエージェントです。<a href="#" id="editprof" style="color:var(--accent-ink)">設定を変更</a></p>`;
+    const chips=el("div","chips");
+    recommended().forEach(t=>{const c=el("button","chip2",`🤖 ${t.agent.name}`);c.onclick=()=>{state.route="detail";state.taskId=t.id;renderAll();window.scrollTo(0,0);};chips.appendChild(c);});
+    rb.appendChild(chips);col.appendChild(rb);
+    const ep=rb.querySelector("#editprof");if(ep)ep.onclick=e=>{e.preventDefault();state.route="profile";renderAll();window.scrollTo(0,0);};
+  }
   if(state.cat==="all"&&!state.q&&!state.tag){
     const band=el("div","newband");
     band.innerHTML=`<h4>🆕 今月の新着スキル・スキル図</h4><p>毎月、新しいエージェントと連携ワークフロー（スキル図）を追加。継続利用の価値をここで更新し続けます。</p>`;
@@ -934,6 +973,28 @@ function renderPlans(){
   v.appendChild(reset);
 }
 
+/* パーソナライズ設定 */
+function renderProfile(){
+  const v=$("#view");v.innerHTML="";const p=getProfile();
+  v.appendChild(el("div","crumb",`<b>マイページ</b> / パーソナライズ設定`));
+  const head=el("div","libhead");head.innerHTML=`<h1><span>🎯</span> パーソナライズ設定</h1>`;v.appendChild(head);
+  v.appendChild(el("p","libsub","あなたの<b>業界・職種・関心</b>に合わせて、おすすめエージェントや情報を最適化します。選ぶと自動保存されます。"));
+  const g1=el("div","pgroup");g1.appendChild(el("div","pl","🏢 業界（1つ）"));
+  const c1=el("div","pchips");INDUSTRIES.forEach(ind=>{const b=el("button","tagchip"+(p.industry===ind?" on":""),ind);b.onclick=()=>{p.industry=(p.industry===ind?null:ind);setProfile(p);renderProfile();};c1.appendChild(b);});g1.appendChild(c1);v.appendChild(g1);
+  const g2=el("div","pgroup");g2.appendChild(el("div","pl","💼 職種（1つ）"));
+  const c2=el("div","pchips");ROLES.forEach(r=>{const b=el("button","tagchip"+(p.role===r.key?" on":""),r.label);b.onclick=()=>{p.role=(p.role===r.key?null:r.key);setProfile(p);renderProfile();};c2.appendChild(b);});g2.appendChild(c2);v.appendChild(g2);
+  const g3=el("div","pgroup");g3.appendChild(el("div","pl","🏷️ 関心のある“やること”（複数可）"));
+  const c3=el("div","pchips");TAG_LIST.forEach(tg=>{const on=(p.tags||[]).includes(tg);const b=el("button","tagchip"+(on?" on":""),tg);b.onclick=()=>{p.tags=p.tags||[];p.tags=on?p.tags.filter(x=>x!==tg):p.tags.concat(tg);setProfile(p);renderProfile();};c3.appendChild(b);});g3.appendChild(c3);v.appendChild(g3);
+  const rl=roleOf(p.role);
+  v.appendChild(el("p","libsub",hasProfile()?`設定済み: ${p.industry||"—"} ／ ${rl?rl.label:"—"} ／ 関心タグ ${(p.tags||[]).length}件`:"まだ設定されていません。"));
+  const act=el("div");act.style.cssText="display:flex;gap:10px;flex-wrap:wrap;align-items:center";
+  const go=el("button","planbtn up","🎯 おすすめエージェントを見る");go.style.cssText="width:auto;padding:11px 18px;margin-top:0";
+  go.onclick=()=>{state.route="library";state.cat="all";state.q="";state.tag=null;renderAll();window.scrollTo(0,0);};
+  act.appendChild(go);
+  const clr=el("button","tagclear","設定をクリア");clr.style.marginLeft="0";clr.onclick=()=>{setProfile({industry:null,role:null,tags:[]});renderProfile();toast("設定をクリアしました");};
+  act.appendChild(clr);v.appendChild(act);
+}
+
 $("#diagBtn").onclick=openDiag;
 $("#planChip").onclick=()=>{state.route="plans";renderAll();window.scrollTo(0,0);};
 $("#segLib").onclick=()=>{state.route="library";renderAll();};
@@ -954,6 +1015,7 @@ function renderAll(){
   else if(state.route==="flows")renderFlows();
   else if(state.route==="flow")renderFlow();
   else if(state.route==="plans")renderPlans();
+  else if(state.route==="profile")renderProfile();
   else renderLibrary();
 }
 $(".icobtn[title='お知らせ']").onclick=()=>{state.route="news";renderAll();window.scrollTo(0,0);};
