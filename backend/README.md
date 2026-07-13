@@ -12,6 +12,7 @@ AIエージェント・サブスクの裏側。設計書（[workflow系のbacken
 | `pipeline/ingest.py` | ② 取り込みパイプライン | 記事/PDF/PR TIMES 取得 → Claude要約 → **重複しない**もののみ保存 | `ANTHROPIC_API_KEY`、取得部の実装（Tavily/OCR/スクレイパ） |
 | `obsidian/flowgen.py` | ③ Obsidian知識構造化 | ワークフロー定義 → **Mermaidフローチャート** → Vaultノート生成 | 標準ライブラリのみ |
 | `scoring/score.py` | ④ スコアリング学習ループ | 表示/クリック/使用/DL を集計 → スコア → 改善対象特定 | 中核は標準ライブラリ、改善提案のみ `anthropic` |
+| `billing/billing.py` | 課金・エンタイトルメント | 無料/標準/プレミアムの判定・利用メータリング・残数。決済(Stripe)・電話番号認証(SMS OTP)はスタブ | 中核は標準ライブラリ、決済/SMSは Stripe/Twilio キー＋デプロイ |
 
 ## セットアップ
 

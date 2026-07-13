@@ -237,8 +237,8 @@
   .planchip{border:1px solid var(--line);background:#fff;border-radius:10px;padding:7px 12px;font-size:12px;font-weight:700;color:var(--slate);display:flex;align-items:center;gap:6px}
   .planchip:hover{background:var(--canvas)}
   .planchip.prem{background:linear-gradient(135deg,#5B4BE1,#8b7bf0);color:#fff;border:none}
-  .plans2{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:720px}
-  @media(max-width:640px){.plans2{grid-template-columns:1fr}}
+  .plans2{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:860px}
+  @media(max-width:760px){.plans2{grid-template-columns:1fr}}
   .plan{background:var(--surface);border:1px solid var(--line-strong);border-radius:16px;padding:22px;box-shadow:var(--shadow);position:relative}
   .plan.cur{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-wash)}
   .plan.prem{background:linear-gradient(135deg,#141A2E,#2a2350);color:#fff;border:none}
@@ -470,8 +470,9 @@ const OKEY="task-agents-owned-v2";
 let owned=new Set(JSON.parse(localStorage.getItem(OKEY)||"[]"));
 const saveOwned=()=>localStorage.setItem(OKEY,JSON.stringify([...owned]));
 /* 料金プラン・利用回数（フロントで完結。本番はサーバー側の課金判定に置換） */
-const PLAN_KEY="task-plan-v1",USAGE_KEY="task-usage-v1",STD_LIMIT=5;
-const getPlan=()=>localStorage.getItem(PLAN_KEY)||"standard";
+const PLAN_KEY="task-plan-v1",USAGE_KEY="task-usage-v1",FREE_LIMIT=1,STD_LIMIT=5;
+const getPlan=()=>localStorage.getItem(PLAN_KEY)||"free";
+const limitFor=p=>p==="premium"?Infinity:(p==="standard"?STD_LIMIT:FREE_LIMIT);
 const setPlan=p=>{localStorage.setItem(PLAN_KEY,p);updatePlanChip();};
 const getUsage=()=>parseInt(localStorage.getItem(USAGE_KEY)||"0",10);
 const setUsage=n=>{localStorage.setItem(USAGE_KEY,String(n));updatePlanChip();};
@@ -571,6 +572,10 @@ function renderSide(){
   prf.innerHTML=`<span class="ic">🎯</span><span>パーソナライズ</span>`+(hasProfile()?`<span class="ct">設定済</span>`:`<span class="newtag">NEW</span>`);
   prf.onclick=()=>{state.route="profile";renderAll();window.scrollTo(0,0);};
   g2.appendChild(prf);
+  const frb=el("button","navitem"+(state.route==="free"?" active":""));
+  frb.innerHTML=`<span class="ic">🆓</span><span>無料会員ページ</span>`;
+  frb.onclick=()=>{state.route="free";renderAll();window.scrollTo(0,0);};
+  g2.appendChild(frb);
   [["🧭","業務診断",()=>openDiag()],["♡","お気に入り",()=>toast("プロトタイプでは未実装です")],["⚙","設定",()=>toast("プロトタイプでは未実装です")]].forEach(([ic,lb,fn])=>{
     const b=el("button","navitem");b.innerHTML=`<span class="ic">${ic}</span><span>${lb}</span>`;b.onclick=fn;g2.appendChild(b);
   });
@@ -861,14 +866,20 @@ function renderLesson(){
 }
 
 /* 時事ニュース フィード */
+function newsRelevant(n){
+  if(!hasProfile())return false;
+  const p=getProfile();const r=roleOf(p.role);const cat=r&&r.cat!=="all"?r.cat:null;
+  return (n.tasks||[]).some(id=>{const t=TASKS.find(x=>x.id===id);if(!t)return false;
+    return (cat&&t.cat===cat)||((p.tags&&p.tags.length)&&tagsOf(id).some(g=>p.tags.includes(g)));});
+}
 function newsCard(n){
-  const c=catOf(n.cat)||catOf("all");const isNew=n.id===justPushed;
+  const c=catOf(n.cat)||catOf("all");const isNew=n.id===justPushed;const rel=newsRelevant(n);
   const card=el("div","news"+(isNew?" isnew":""));
   const tags=(n.tasks||[]).map(id=>{const t=TASKS.find(x=>x.id===id);return t?`<button class="ntag" data-task="${id}">${t.name}</button>`:"";}).join("");
   card.innerHTML=`
     <div class="nico" style="background:${c.grad}">${c.icon}</div>
     <div class="nbody">
-      <div class="ntop"><span class="src">${n.src}</span><span>・</span><span class="ntime">${ago(n.min)}</span>${isNew?`<span class="newnow">NEW</span>`:``}</div>
+      <div class="ntop"><span class="src">${n.src}</span><span>・</span><span class="ntime">${ago(n.min)}</span>${isNew?`<span class="newnow">NEW</span>`:``}${rel?`<span class="newnow" style="background:var(--violet)">あなた向け</span>`:``}</div>
       <div class="nt">${n.title}</div>
       <div class="ns">${n.summary}</div>
       ${tags?`<div class="ntags"><span class="lbl">この情報が効く業務:</span>${tags}</div>`:``}
@@ -882,9 +893,10 @@ function renderNews(){
   const head=el("div","newshead");
   head.innerHTML=`<h1 style="font-size:21px;font-weight:800;margin:0">🗞️ 時事ニュース</h1><span class="live"><span class="pulse"></span>自動更新中</span><span style="font-size:12px;color:var(--faint)">最終更新: たった今</span>`;
   v.appendChild(head);
-  v.appendChild(el("p","libsub","AI・業務に関わる最新情報を、収集エージェントが<b>自動で収集・要約して投稿</b>し続けます。<b>過去に出した情報とは重複しないよう生成</b>し、各ニュースは関連する業務タスクに紐づいて、そのまま使えるエージェントへ移動できます。"));
+  v.appendChild(el("p","libsub",`AI・業務に関わる最新情報を、収集エージェントが<b>自動で収集・要約して投稿</b>し続けます。<b>過去に出した情報とは重複しないよう生成</b>し、各ニュースは関連する業務タスクに紐づきます。${hasProfile()?"<b>あなたの業務に関係するニュースを上位表示</b>しています。":""}`));
   const feed=el("div","feed");
-  liveNews.forEach(n=>feed.appendChild(newsCard(n)));
+  const ordered=hasProfile()?[...liveNews].sort((a,b)=>(newsRelevant(b)?1:0)-(newsRelevant(a)?1:0)):liveNews;
+  ordered.forEach(n=>feed.appendChild(newsCard(n)));
   v.appendChild(feed);
   startNewsFeed();
 }
@@ -924,8 +936,9 @@ function openModal(title,sub,inner){
 }
 /* エージェント実行（利用回数・上限・成果物プレビュー） */
 function runAgent(t){
-  if(getPlan()==="standard"&&getUsage()>=STD_LIMIT){openUpsell();return;}
-  if(getPlan()==="standard")setUsage(getUsage()+1);
+  const plan=getPlan();
+  if(getUsage()>=limitFor(plan)){openUpsell();return;}
+  if(plan!=="premium")setUsage(getUsage()+1);
   openOutput(t);
 }
 function openOutput(t){
@@ -942,35 +955,71 @@ function openOutput(t){
   const dl=$("#dlOut");if(dl)dl.onclick=()=>toast("ダウンロードは本番で提供されます","⬇️");
 }
 function openUpsell(){
-  openModal("⬆️ 今月の上限に達しました",`標準プランの上限（月${STD_LIMIT}本）に達しました。プレミアムなら回数無制限で使えます。`,
-    `<button class="btn get" id="upBtn">プレミアムにアップグレード（月9,800円）</button>`);
-  const b=$("#upBtn");if(b)b.onclick=()=>{setPlan("premium");$("#mscrim").classList.remove("on");toast("プレミアムにアップグレードしました","💎");renderAll();};
+  const plan=getPlan();const lim=limitFor(plan);
+  const head=plan==="free"?`無料プランのお試し上限（月${lim}本）`:`標準プランの上限（月${lim}本）`;
+  openModal("⬆️ 今月の上限に達しました",`${head}に達しました。アップグレードでもっと使えます。`,
+    plan==="free"
+    ?`<button class="btn get" id="upStd">標準プランにする（月5本・¥4,980）</button><button class="btn use" id="upPrem" style="margin-top:8px">プレミアム（無制限・¥9,800）</button>`
+    :`<button class="btn get" id="upPrem">プレミアムにアップグレード（¥9,800/月）</button>`);
+  const s=$("#upStd");if(s)s.onclick=()=>{setPlan("standard");$("#mscrim").classList.remove("on");toast("標準プランにしました");renderAll();};
+  const pr=$("#upPrem");if(pr)pr.onclick=()=>{setPlan("premium");$("#mscrim").classList.remove("on");toast("プレミアムにアップグレードしました","💎");renderAll();};
 }
 function updatePlanChip(){
-  const chip=$("#planChip");if(!chip)return;
-  if(getPlan()==="premium"){chip.className="planchip prem";chip.innerHTML="💎 プレミアム ・ 無制限";}
-  else{chip.className="planchip";chip.innerHTML=`💳 標準 ・ 今月 <span class="tnum">${getUsage()}/${STD_LIMIT}</span>本`;}
+  const chip=$("#planChip");if(!chip)return;const plan=getPlan();
+  if(plan==="premium"){chip.className="planchip prem";chip.innerHTML="💎 プレミアム ・ 無制限";}
+  else if(plan==="standard"){chip.className="planchip";chip.innerHTML=`💳 標準 ・ 今月 <span class="tnum">${getUsage()}/${STD_LIMIT}</span>本`;}
+  else{chip.className="planchip";chip.innerHTML=`🆓 無料 ・ お試し <span class="tnum">${getUsage()}/${FREE_LIMIT}</span>本`;}
+}
+function planCard(grid,key,title,price,feats,cur){
+  const card=el("div","plan"+(key==="premium"?" prem":"")+(cur===key?" cur":""));
+  const badge=cur===key?`<span class="curbadge"${key==="premium"?' style="background:rgba(255,255,255,.2);color:#fff"':''}>現在のプラン</span>`:"";
+  card.innerHTML=`${badge}<div class="pname">${title}</div><div class="price">${price}<small>/月</small></div><ul>${feats.map(f=>`<li>${f}</li>`).join("")}</ul>`;
+  const label={free:"無料に変更",standard:"標準にする",premium:"アップグレード"}[key];
+  const btn=el("button","planbtn "+(cur===key?"cur":"up"),cur===key?"利用中":label);
+  if(cur!==key)btn.onclick=()=>{setPlan(key);renderPlans();toast(`${title.replace(/^[^ ]+ /,"")}にしました`,key==="premium"?"💎":"✓");};
+  card.appendChild(btn);grid.appendChild(card);
 }
 function renderPlans(){
-  const v=$("#view");v.innerHTML="";
-  const cur=getPlan();
+  const v=$("#view");v.innerHTML="";const cur=getPlan();
   v.appendChild(el("div","crumb",`<b>マイページ</b> / 料金プラン`));
   const head=el("div","libhead");head.innerHTML=`<h1><span>💳</span> 料金プラン</h1>`;v.appendChild(head);
-  v.appendChild(el("p","libsub",`忘れられる金額で継続。標準は機能制限つき、プレミアムは全機能・回数無制限。<b>現在のプラン: ${cur==="premium"?"プレミアム":"標準"}</b>`));
+  const cname={free:"無料",standard:"標準",premium:"プレミアム"}[cur];
+  v.appendChild(el("p","libsub",`無料で始めて、必要に応じてアップグレード。<b>現在のプラン: ${cname}</b>`));
   const grid=el("div","plans2");
-  const std=el("div","plan"+(cur==="standard"?" cur":""));
-  std.innerHTML=`${cur==="standard"?'<span class="curbadge">現在のプラン</span>':''}<div class="pname">💳 標準プラン</div><div class="price">¥4,980<small>/月</small></div><ul><li>業務エージェント辞書・検索・タグ横断</li><li>時事ニュース（鮮度情報）</li><li>使い方レクチャー</li><li>利用 月${STD_LIMIT}本まで／DL上限あり</li></ul>`;
-  const sbtn=el("button","planbtn "+(cur==="standard"?"cur":"up"),cur==="standard"?"利用中":"標準に変更");
-  if(cur!=="standard")sbtn.onclick=()=>{setPlan("standard");renderPlans();toast("標準プランに変更しました");};
-  std.appendChild(sbtn);grid.appendChild(std);
-  const prem=el("div","plan prem"+(cur==="premium"?" cur":""));
-  prem.innerHTML=`${cur==="premium"?'<span class="curbadge" style="background:rgba(255,255,255,.2);color:#fff">現在のプラン</span>':''}<div class="pname">💎 プレミアムプラン</div><div class="price">¥9,800<small>/月</small></div><ul><li>全機能を利用可能</li><li>エージェント利用・DL 無制限</li><li>連携ワークフロー フル</li><li>新鮮情報・パーソナライズ フル</li></ul>`;
-  const pbtn=el("button","planbtn "+(cur==="premium"?"cur":"up"),cur==="premium"?"利用中":"プレミアムにアップグレード");
-  if(cur!=="premium")pbtn.onclick=()=>{setPlan("premium");renderPlans();toast("プレミアムにアップグレードしました","💎");};
-  prem.appendChild(pbtn);grid.appendChild(prem);
+  planCard(grid,"free","🆓 無料プラン","¥0",["辞書の閲覧・検索・タグ横断","時事ニュース（一部）","使い方レクチャー",`エージェントお試し 月${FREE_LIMIT}本`],cur);
+  planCard(grid,"standard","💳 標準プラン","¥4,980",["無料の全機能",`エージェント利用 月${STD_LIMIT}本`,"時事ニュース フル","DL上限あり"],cur);
+  planCard(grid,"premium","💎 プレミアム","¥9,800",["全機能を利用可能","エージェント利用・DL 無制限","連携ワークフロー フル","新鮮情報・パーソナライズ フル"],cur);
   v.appendChild(grid);
   const reset=el("button","tagclear","（デモ）今月の利用回数をリセット");reset.style.cssText="margin-top:16px;margin-left:0";reset.onclick=()=>{setUsage(0);renderPlans();toast("利用回数をリセットしました");};
   v.appendChild(reset);
+}
+
+/* 無料会員ページ（無料登録の入り口・無料でできることとアップグレード導線） */
+function renderFree(){
+  const v=$("#view");v.innerHTML="";
+  v.appendChild(el("div","crumb",`<b>マイページ</b> / 無料会員ページ`));
+  const head=el("div","libhead");head.innerHTML=`<h1><span>🆓</span> 無料会員ページ</h1>`;v.appendChild(head);
+  v.appendChild(el("p","libsub","無料で使える範囲と、いま使えることをまとめました。まずは1本、AIエージェントをお試しください。"));
+  const w=el("div","newband");
+  w.innerHTML=`<h4>👋 無料会員へようこそ</h4><p>登録ありがとうございます。無料のまま辞書・ニュース・レクチャーを閲覧でき、AIエージェントは<b>月${FREE_LIMIT}本お試し</b>できます。</p>`;
+  const chips=el("div","chips");
+  [["📇 業務辞書を見る",{route:"library",cat:"all",q:"",tag:null}],["🗞️ 時事ニュース",{route:"news"}],["🚀 使い方レクチャー",{route:"setup"}],["🎯 パーソナライズ",{route:"profile"}]].forEach(([lb,patch])=>{const c=el("button","chip2",lb);c.onclick=()=>{Object.assign(state,patch);renderAll();window.scrollTo(0,0);};chips.appendChild(c);});
+  w.appendChild(chips);v.appendChild(w);
+  const used=getUsage();const remain=Math.max(0,FREE_LIMIT-used);
+  const status=el("div","panel");status.style.cssText="max-width:720px;margin-bottom:18px";
+  status.innerHTML=`<h3>🧪 お試しの状況</h3><div class="pbar"><i style="width:${Math.min(100,used/FREE_LIMIT*100)}%"></i></div><div style="font-size:12.5px;color:var(--muted);margin-top:8px" class="tnum">今月 ${used}/${FREE_LIMIT} 本 ・ 残り ${remain} 本</div>`;
+  v.appendChild(status);
+  const cmp=el("div","pgroup");
+  cmp.innerHTML=`<div class="pl">🔓 無料でできること</div><ul style="margin:0 0 14px;padding-left:20px;font-size:13.5px;color:var(--slate);line-height:1.9"><li>業務エージェント辞書の閲覧・検索・タグ横断</li><li>時事ニュース（鮮度情報）の閲覧</li><li>使い方レクチャー（初級〜上級）</li><li>AIエージェントの実行 月${FREE_LIMIT}本お試し</li></ul><div class="pl">🔒 有料で解放されること</div><ul style="margin:0;padding-left:20px;font-size:13.5px;color:var(--muted);line-height:1.9"><li>エージェント実行回数（標準 月5本／プレミアム 無制限）</li><li>成果物のダウンロード上限の解放</li><li>連携ワークフロー・パーソナライズのフル利用</li></ul>`;
+  v.appendChild(cmp);
+  const up=el("button","planbtn up","💳 プランを見てアップグレード");up.style.cssText="width:auto;padding:12px 20px;margin-top:4px";up.onclick=()=>{state.route="plans";renderAll();window.scrollTo(0,0);};
+  v.appendChild(up);
+  if(hasProfile()&&recommended().length){
+    const rb=el("div","newband");rb.style.marginTop="22px";
+    rb.innerHTML=`<h4>🎯 あなたへのおすすめ</h4><p>設定に合わせたエージェントです。まずはお試しで実行してみましょう。</p>`;
+    const rc=el("div","chips");recommended().forEach(t=>{const c=el("button","chip2",`🤖 ${t.agent.name}`);c.onclick=()=>{state.route="detail";state.taskId=t.id;renderAll();window.scrollTo(0,0);};rc.appendChild(c);});
+    rb.appendChild(rc);v.appendChild(rb);
+  }
 }
 
 /* パーソナライズ設定 */
@@ -1016,6 +1065,7 @@ function renderAll(){
   else if(state.route==="flow")renderFlow();
   else if(state.route==="plans")renderPlans();
   else if(state.route==="profile")renderProfile();
+  else if(state.route==="free")renderFree();
   else renderLibrary();
 }
 $(".icobtn[title='お知らせ']").onclick=()=>{state.route="news";renderAll();window.scrollTo(0,0);};
