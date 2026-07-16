@@ -1,5 +1,5 @@
 # Render Blueprint — バックエンドAPIを1クリックでデプロイ
-# 使い方: Render → New → Blueprint → このリポジトリを選択 → ANTHROPIC_API_KEY を入力 → Deploy
+# 使い方: Render → New → Blueprint → このリポジトリを選択 → 環境変数を入力 → Deploy
 services:
   - type: web
     name: task-agents-api
@@ -14,5 +14,24 @@ services:
         sync: false          # ← Render の画面で入力（キーはコードに残さない）
       - key: ALLOW_ORIGINS
         value: "*"           # 本番は https://taketo0904.github.io に絞るのを推奨
+      - key: CRON_KEY
+        sync: false          # ← 下の cron ジョブと同じ値を入力（ニュース自動投稿の認証キー）
       # - key: API_ACCESS_KEY
       #   sync: false        # 有効化すると x-api-key 必須（保護したいとき）
+
+  # 毎日1回、AI業務ニュースを自動収集してWebサービスへ投稿するジョブ
+  - type: cron
+    name: task-agents-news-cron
+    runtime: python
+    plan: free
+    rootDir: backend
+    schedule: "0 22 * * *"    # UTC 22:00 = 日本時間 翌07:00
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m pipeline.cron_ingest
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false          # ← 上のWebサービスと同じキーを入力
+      - key: NEWS_API_BASE
+        value: https://task-agents-api.onrender.com
+      - key: CRON_KEY
+        sync: false          # ← 上のWebサービスと同じ値を入力

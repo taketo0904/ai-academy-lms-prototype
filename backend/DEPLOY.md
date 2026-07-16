@@ -16,9 +16,13 @@
 1. <https://render.com> にサインイン（GitHubでログイン）
 2. **New → Blueprint** を選択
 3. このリポジトリ `taketo0904/ai-academy-lms-prototype` を接続 → ルートの **`render.yaml` が自動検出**される
-4. 環境変数 **`ANTHROPIC_API_KEY`** に、用意したキーを貼る → **Apply / Deploy**
+4. `render.yaml` には **Webサービス**（`task-agents-api`）と、毎日ニュースを自動収集する**Cronジョブ**（`task-agents-news-cron`）の2つが定義されている。両方に以下を入力:
+   - **`ANTHROPIC_API_KEY`**（両サービス共通・同じキー）
+   - **`CRON_KEY`**（任意の文字列。両サービスで**同じ値**にする。ニュース投稿の認証に使う）
+   → **Apply / Deploy**
 5. 数分でデプロイ完了。**URL**（例: `https://task-agents-api.onrender.com`）をコピー
 6. 疎通確認: ブラウザで `https://<そのURL>/healthz` を開き `{"ok": true, ...}` が出ればOK
+7. ニュースは毎日 日本時間07:00に自動収集されます（Cronジョブが `/v1/news/ingest` へ投稿）。初回だけ手動で試したい場合は、Renderの `task-agents-news-cron` 画面で **Trigger Run** を押すと即実行されます。
 
 ## 手順B: プロダクトに繋ぐ
 1. 公開中のプロトタイプを開く → **設定（⚙）** → **「APIのURL」** に上のURLを貼る → **保存**
@@ -43,3 +47,4 @@
 ## 補足
 - 実装は `backend/api/`（`main.py` = API、`agents.py` = 30エージェント＋ワークフロー定義）。
 - 承認公開でユーザーが増やしたエージェント（`p...`）は、本番ではDB保存＋API側の動的読込が必要（現状はフロント内のみ）。まずは定義済み30体＋ワークフローが本物で動きます。
+- ニュース自動収集は `backend/pipeline/`（`ingest.py` = RSS取得＋Claude要約＋重複除去、`cron_ingest.py` = 毎日実行してAPIへ投稿）。現状はAPI側でインメモリ保存のため、無料インスタンスのスリープ復帰時にリセットされる（次回のcronで再度たまる）。長期保存が要る場合はDB化が必要。

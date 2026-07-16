@@ -572,6 +572,28 @@ const catOf=code=>CATS.find(c=>c.code===code);
 let state={cat:"all",view:"grid",q:"",route:"library",taskId:null,level:"beg",lessonId:null,flowId:null,tag:null};
 let liveNews=NEWS.map(n=>({...n})),newsTimer=null,extraIdx=0,justPushed=null;
 function ago(min){if(min<1)return"たった今";if(min<60)return`${min}分前`;if(min<1440)return`${Math.floor(min/60)}時間前`;return`${Math.floor(min/1440)}日前`;}
+/* 実ニュース（バックエンドのcronが毎日収集したもの）: API接続時のみ取得。未接続はサンプルのまま。 */
+let realNews=null; // null=未取得, []=取得したが0件, [...]=実データ
+function taskIdByAgentName(name){
+  const t=ALLTASKS().find(x=>(x.agent&&x.agent.name===name)||x.name===name);
+  return t?t.id:null;
+}
+function apiToNewsItem(it,i){
+  const min=it.published?Math.max(0,Math.round((Date.now()-new Date(it.published).getTime())/60000)):i*7;
+  return{id:"real"+i,cat:null,src:it.source||"自動収集AI",min,
+    tasks:(it.tasks||[]).map(taskIdByAgentName).filter(Boolean),
+    title:it.title||"(無題)",summary:it.summary||"",link:it.link||""};
+}
+async function fetchRealNews(){
+  if(!apiConnected())return null;
+  try{
+    const base=getApiBase().replace(/\/$/,"");const key=getApiKey();
+    const res=await fetch(base+"/v1/news/latest",{headers:key?{"x-api-key":key}:{}});
+    if(!res.ok)return[];
+    const data=await res.json();
+    return(data.items||[]).map(apiToNewsItem);
+  }catch(e){return[];}
+}
 
 /* =====================================================================
    セットアップ（スタートガイド）: 初級→中級→上級 の3レベル。
@@ -1001,15 +1023,31 @@ function newsCard(n){
 function renderNews(){
   const v=$("#view");v.innerHTML="";
   v.appendChild(el("div","crumb",`<b>情報</b> / 時事ニュース`));
+  const connected=apiConnected();
   const head=el("div","newshead");
-  head.innerHTML=`<h1 style="font-size:21px;font-weight:800;margin:0">🗞️ 時事ニュース</h1><span class="live"><span class="pulse"></span>自動更新中</span><span style="font-size:12px;color:var(--faint)">最終更新: たった今</span>`;
+  if(connected&&realNews&&realNews.length){
+    head.innerHTML=`<h1 style="font-size:21px;font-weight:800;margin:0">🗞️ 時事ニュース</h1><span class="live"><span class="pulse"></span>自動収集（本番）</span><span style="font-size:12px;color:var(--faint)">毎日07:00に自動収集</span>`;
+  }else if(connected&&realNews&&!realNews.length){
+    head.innerHTML=`<h1 style="font-size:21px;font-weight:800;margin:0">🗞️ 時事ニュース</h1><span class="live" style="background:var(--faint)"><span class="pulse"></span>本日分は未収集</span><span style="font-size:12px;color:var(--faint)">毎日07:00に自動収集・以下はサンプル</span>`;
+  }else if(connected&&realNews===null){
+    head.innerHTML=`<h1 style="font-size:21px;font-weight:800;margin:0">🗞️ 時事ニュース</h1><span class="live"><span class="pulse"></span>取得中…</span>`;
+  }else{
+    head.innerHTML=`<h1 style="font-size:21px;font-weight:800;margin:0">🗞️ 時事ニュース</h1><span class="live"><span class="pulse"></span>サンプル表示</span><span style="font-size:12px;color:var(--faint)">API接続で本番の自動収集に切り替わります</span>`;
+  }
   v.appendChild(head);
   v.appendChild(el("p","libsub",`AI・業務に関わる最新情報を、収集エージェントが<b>自動で収集・要約して投稿</b>し続けます。<b>過去に出した情報とは重複しないよう生成</b>し、各ニュースは関連する業務タスクに紐づきます。${hasProfile()?"<b>あなたの業務に関係するニュースを上位表示</b>しています。":""}`));
   const feed=el("div","feed");
-  const ordered=hasProfile()?[...liveNews].sort((a,b)=>(newsRelevant(b)?1:0)-(newsRelevant(a)?1:0)):liveNews;
+  const base=(connected&&realNews&&realNews.length)?realNews:liveNews;
+  const ordered=hasProfile()?[...base].sort((a,b)=>(newsRelevant(b)?1:0)-(newsRelevant(a)?1:0)):base;
   ordered.forEach(n=>feed.appendChild(newsCard(n)));
   v.appendChild(feed);
-  startNewsFeed();
+  if(connected){
+    if(realNews===null){
+      fetchRealNews().then(items=>{realNews=items;if(state.route==="news")renderNews();});
+    }
+  }else{
+    startNewsFeed();
+  }
 }
 function startNewsFeed(){
   stopNewsFeed();
@@ -1232,7 +1270,7 @@ function openSettings(){
      <button class="btn get" id="apiSave">接続設定を保存</button>
      <div style="font-size:11.5px;color:var(--faint);margin-top:8px">状態: ${base?'🟢 接続設定あり（本物のAPIを呼びます）':'⚪ 未接続（サンプル出力）'}</div>`);
   const b=$("#adminToggle");if(b)b.onclick=()=>{setRole(admin?"member":"admin");$("#mscrim").classList.remove("on");toast(admin?"メンバーに戻しました":"管理者モードにしました","🔑");if(!isAdmin()&&state.route==="review")state.route="library";renderAll();};
-  const sv=$("#apiSave");if(sv)sv.onclick=()=>{localStorage.setItem(API_BASE_KEY,($("#apiBase").value||'').trim());localStorage.setItem(API_KEY_KEY,($("#apiKey").value||'').trim());$("#mscrim").classList.remove("on");toast(getApiBase()?"APIに接続する設定を保存しました":"未接続（サンプル）に戻しました","🔌");renderAll();};
+  const sv=$("#apiSave");if(sv)sv.onclick=()=>{localStorage.setItem(API_BASE_KEY,($("#apiBase").value||'').trim());localStorage.setItem(API_KEY_KEY,($("#apiKey").value||'').trim());realNews=null;$("#mscrim").classList.remove("on");toast(getApiBase()?"APIに接続する設定を保存しました":"未接続（サンプル）に戻しました","🔌");renderAll();};
 }
 $("#diagBtn").onclick=openDiag;
 $("#planChip").onclick=()=>{state.route="plans";renderAll();window.scrollTo(0,0);};
