@@ -427,6 +427,20 @@ const ROLES=[
   {key:"mgr",label:"経営・その他",cat:"all"},
 ];
 const roleOf=key=>ROLES.find(r=>r.key===key);
+/* 業種フィルター: 業種ごとに「よく使う」業務カテゴリを軽量に対応づけ、表示順・注目タスクを切り替える。 */
+const INDUSTRY_FOCUS={
+  "IT・ソフトウェア":["CM06","US03","DV15"],
+  "建設・不動産":["SP01","SP02","DV15"],
+  "製造":["SP02","DV15","US03"],
+  "小売・EC":["CM01","SP02","CM06"],
+  "医療・介護":["SP02","US03"],
+  "士業・コンサル":["SP01","CM06","SP02"],
+  "教育":["CM01","SP02"],
+  "飲食・サービス":["SP02","CM01"],
+  "その他":[],
+};
+const industryFocusCats=()=>INDUSTRY_FOCUS[getProfile().industry]||[];
+const industryRelevant=t=>industryFocusCats().includes(t.cat);
 
 /* 特化型エージェントの複数連携（万能1体でなく、タスク特化を直列につなぐ）。=「スキル図」。 */
 const S=(agent,inp,out,build)=>({agent,in:inp,out,build:!!build});
@@ -710,6 +724,18 @@ function renderLibrary(){
   v.appendChild(head);
   v.appendChild(el("p","libsub","業務をタスク単位に細分化し、それぞれに<b>すぐ使えるAIエージェント</b>を紐づけています。未整備のタスクは「1日以内で作成」をリクエストできます。"));
 
+  // 業種フィルター（同じ30業務タスクのまま、業種でよく使うものを上位表示）
+  const indbar=el("div","tagbar");
+  indbar.appendChild(el("span","tl","業種で絞り込み:"));
+  const curInd=getProfile().industry;
+  INDUSTRIES.forEach(ind=>{
+    const b=el("button","tagchip"+(curInd===ind?" on":""),ind);
+    b.onclick=()=>{const pp=getProfile();pp.industry=(pp.industry===ind?null:ind);setProfile(pp);renderAll();window.scrollTo(0,0);};
+    indbar.appendChild(b);
+  });
+  if(curInd){const cl=el("button","tagclear","解除 ✕");cl.onclick=()=>{const pp=getProfile();pp.industry=null;setProfile(pp);renderAll();};indbar.appendChild(cl);}
+  v.appendChild(indbar);
+
   // タグ横断バー（業務カテゴリをまたいで“やること”の軸で探す）
   const tagbar=el("div","tagbar");
   tagbar.appendChild(el("span","tl","タグで横断:"));
@@ -743,7 +769,9 @@ function renderLibrary(){
   }
   if(list.length===0){col.appendChild(el("div","empty",`<div class="big">🔍</div>該当する業務タスクがありません。`));}
   else{
-    const groups=[];list.forEach(t=>{let g=groups.find(x=>x.mid===t.mid&&x.cat===t.cat);if(!g){g={mid:t.mid,cat:t.cat,items:[]};groups.push(g);}g.items.push(t);});
+    // 業種選択時: 同じ30業務タスクのまま、その業種でよく使うカテゴリを表示順の先頭に（安定ソート＝グループ内の並びは維持）
+    const ordered=curInd?[...list].sort((a,b)=>(industryRelevant(b)?1:0)-(industryRelevant(a)?1:0)):list;
+    const groups=[];ordered.forEach(t=>{let g=groups.find(x=>x.mid===t.mid&&x.cat===t.cat);if(!g){g={mid:t.mid,cat:t.cat,items:[]};groups.push(g);}g.items.push(t);});
     groups.forEach(g=>{
       const gw=el("div","midgrp");
       gw.appendChild(el("div","midh",`<span>${g.mid}</span><span class="code">${catOf(g.cat).label}</span><span class="ln"></span>`));
@@ -775,7 +803,7 @@ function taskCard(t){
     </div>
     <div class="body">
       <div class="title">${t.name}</div>
-      <div class="meta">${t.mid}</div>
+      <div class="meta">${t.mid}${getProfile().industry&&industryRelevant(t)?` <span style="color:var(--accent-ink);font-weight:700">・${getProfile().industry}で人気</span>`:``}</div>
       <div class="ctags">${tagsOf(t.id).slice(0,2).map(g=>`<span class="ctag">${g}</span>`).join("")}</div>
       ${strip}
     </div>`;
