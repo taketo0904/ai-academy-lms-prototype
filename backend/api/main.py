@@ -1,14 +1,16 @@
 """
-サービス側API（プラットフォーム内完結エージェント実行）— リファレンス実装。
+サービス側API（プラットフォーム内完結エージェント実行）。
 
-会議決定: ユーザーは自分のClaude契約なしで、サービス側APIでエージェントを実行して成果物を得る。
-- 単体エージェント実行:   POST /v1/agents/{id}/run
-- 連携ワークフロー実行:   POST /v1/workflows/{id}/run   （特化型を直列連携）
-- 認証: APIキー（本番は電話番号認証＋プラン判定を前段に）
+- 単体エージェント:   POST /v1/agents/{id}/run     body {"input": "..."}  → ストリーミング(text/plain)
+- 連携ワークフロー:   POST /v1/workflows/{id}/run  body {"input": "..."}  → 各ステップを直列連携
+- ヘルス:             GET  /healthz
 
-前提: `pip install fastapi uvicorn "anthropic>=0.40"` / 環境変数 ANTHROPIC_API_KEY。
-起動: `uvicorn backend.api.main:app --reload`
-※ このリポジトリでは未実行のリファレンス。デプロイ環境で動かす。
+必要な環境変数:
+  ANTHROPIC_API_KEY   … 必須（Anthropic のキー）
+  API_ACCESS_KEY      … 任意。設定するとリクエストに x-api-key 必須（未設定なら誰でも叩ける＝まず動かす用）
+  ALLOW_ORIGINS       … 任意。CORS 許可オリジン（カンマ区切り）。既定は "*"
+
+起動: uvicorn backend.api.main:app --host 0.0.0.0 --port ${PORT:-8000}
 """
 from __future__ import annotations
 
@@ -17,70 +19,53 @@ from typing import Iterator
 
 import anthropic
 from fastapi import FastAPI, Header, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from .agents import AGENTS, WORKFLOWS, system_for
+
 client = anthropic.Anthropic()  # ANTHROPIC_API_KEY を環境から解決
-app = FastAPI(title="Task Agents API", version="0.1")
+app = FastAPI(title="Task Agents API", version="1.0")
 
-# --- モデルの出し分け（原価管理）: 定型=Haiku、企画/レビュー=Opus ---
-CHEAP = "claude-haiku-4-5"
-SMART = "claude-opus-4-8"
+# CORS: フロント（GitHub Pages 等）からの呼び出しを許可
+_origins = [o.strip() for o in os.getenv("ALLOW_ORIGINS", "*").split(",") if o.strip()]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_origins or ["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# --- エージェント定義（フロントの辞書と対応。入力→出力＋実行プロンプト）---
-AGENTS: dict[str, dict] = {
-    "t1": {
-        "name": "リストアップ・スキル",
-        "model": CHEAP,
-        "system": "あなたは営業リスト作成の専門エージェント。入力の検索条件と既存台帳から、"
-                  "重複・営業済みを除いた新規リードだけを、会社名・担当・連絡先の表形式で出力する。",
-    },
-    "t3": {
-        "name": "提案書ドラフト生成",
-        "model": SMART,
-        "system": "あなたは提案書作成の専門エージェント。ヒアリング内容から、課題→打ち手→"
-                  "見積骨子の順で、そのまま使える提案書ドラフトを出力する。",
-    },
-    # ... 辞書の全タスク分をここに定義（本番はDB/設定ファイルから読み込む）
-}
-
-# --- 連携ワークフロー（特化型エージェントを直列連携）---
-WORKFLOWS: dict[str, dict] = {
-    "wf2": {
-        "name": "新規リード獲得→受注フォロー",
-        "steps": ["t1", "t3"],  # 実際は 5 ステップ。前段の出力を次段の入力へ渡す
-    },
-}
+_ACCESS_KEY = os.getenv("API_ACCESS_KEY", "")
 
 
 class RunRequest(BaseModel):
-    input: str
+    input: str = ""
 
 
-def _check_key(api_key: str | None) -> None:
-    # 本番: DBでキー検証＋プラン判定＋利用上限チェック＋電話番号認証
-    if not api_key:
-        raise HTTPException(status_code=401, detail="missing api key")
+def _auth(x_api_key: str | None) -> None:
+    # API_ACCESS_KEY を設定したときだけ認証を要求（未設定なら誰でも可＝まず動かす用）
+    if _ACCESS_KEY and x_api_key != _ACCESS_KEY:
+        raise HTTPException(status_code=401, detail="invalid api key")
 
 
-def _run_agent(agent: dict, user_input: str) -> Iterator[str]:
-    """1エージェントを実行し、テキストをストリーミングで返す。"""
+def _run(agent: dict, user_input: str) -> Iterator[str]:
     with client.messages.stream(
         model=agent["model"],
         max_tokens=4096,
-        system=agent["system"],
-        messages=[{"role": "user", "content": user_input}],
+        system=system_for(agent),
+        messages=[{"role": "user", "content": user_input or "（入力なし）サンプルを1つ生成してください。"}],
     ) as stream:
         for text in stream.text_stream:
             yield text
 
 
-def _run_agent_collect(agent: dict, user_input: str) -> str:
-    """1エージェントを実行し、完成テキストを返す（ワークフローの中間段で使用）。"""
+def _run_collect(agent: dict, user_input: str) -> str:
     with client.messages.stream(
         model=agent["model"],
         max_tokens=4096,
-        system=agent["system"],
+        system=system_for(agent),
         messages=[{"role": "user", "content": user_input}],
     ) as stream:
         msg = stream.get_final_message()
@@ -89,30 +74,32 @@ def _run_agent_collect(agent: dict, user_input: str) -> str:
 
 @app.post("/v1/agents/{agent_id}/run")
 def run_agent(agent_id: str, req: RunRequest, x_api_key: str | None = Header(default=None)):
-    _check_key(x_api_key)
+    _auth(x_api_key)
     agent = AGENTS.get(agent_id)
     if not agent:
         raise HTTPException(status_code=404, detail="agent not found")
-    return StreamingResponse(_run_agent(agent, req.input), media_type="text/plain")
+    return StreamingResponse(_run(agent, req.input), media_type="text/plain; charset=utf-8")
 
 
 @app.post("/v1/workflows/{wf_id}/run")
 def run_workflow(wf_id: str, req: RunRequest, x_api_key: str | None = Header(default=None)):
-    _check_key(x_api_key)
+    _auth(x_api_key)
     wf = WORKFLOWS.get(wf_id)
     if not wf:
         raise HTTPException(status_code=404, detail="workflow not found")
 
     def gen() -> Iterator[str]:
         payload = req.input
-        for step_id in wf["steps"]:
-            agent = AGENTS[step_id]
-            yield f"\n\n=== {agent['name']} ===\n"
-            out = _run_agent_collect(agent, payload)
-            yield out
-            payload = out  # 前段の出力を次段の入力へ（直列連携）
+        yield f"【ワークフロー: {wf['name']}】\n"
+        for i, sid in enumerate(wf["steps"], 1):
+            agent = AGENTS[sid]
+            yield f"\n▼ STEP {i} {agent['name']}\n"
+            out = _run_collect(agent, payload)
+            yield out + "\n"
+            payload = out  # 前段の出力を次段の入力へ
+        yield "\n＝ 最終成果物は上記の最終ステップ出力です ＝\n"
 
-    return StreamingResponse(gen(), media_type="text/plain")
+    return StreamingResponse(gen(), media_type="text/plain; charset=utf-8")
 
 
 @app.get("/healthz")

@@ -1,0 +1,18 @@
+# Render Blueprint — バックエンドAPIを1クリックでデプロイ
+# 使い方: Render → New → Blueprint → このリポジトリを選択 → ANTHROPIC_API_KEY を入力 → Deploy
+services:
+  - type: web
+    name: task-agents-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false          # ← Render の画面で入力（キーはコードに残さない）
+      - key: ALLOW_ORIGINS
+        value: "*"           # 本番は https://taketo0904.github.io に絞るのを推奨
+      # - key: API_ACCESS_KEY
+      #   sync: false        # 有効化すると x-api-key 必須（保護したいとき）
