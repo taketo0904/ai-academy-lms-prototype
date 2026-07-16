@@ -23,6 +23,7 @@
 5. 数分でデプロイ完了。**URL**（例: `https://task-agents-api.onrender.com`）をコピー
 6. 疎通確認: ブラウザで `https://<そのURL>/healthz` を開き `{"ok": true, ...}` が出ればOK
 7. ニュースは毎日 日本時間07:00に自動収集されます（Cronジョブが `/v1/news/ingest` へ投稿）。初回だけ手動で試したい場合は、Renderの `task-agents-news-cron` 画面で **Trigger Run** を押すと即実行されます。
+8. **課金メモ**: RenderのCron Jobには無料プランがなく、`plan: starter`（実行時間課金）を使用。1日1回・数十秒の実行なので実質月数十円程度の見込み（Webサービス本体は引き続き無料枠）。
 
 ## 手順B: プロダクトに繋ぐ
 1. 公開中のプロトタイプを開く → **設定（⚙）** → **「APIのURL」** に上のURLを貼る → **保存**

@@ -20,10 +20,11 @@ services:
       #   sync: false        # 有効化すると x-api-key 必須（保護したいとき）
 
   # 毎日1回、AI業務ニュースを自動収集してWebサービスへ投稿するジョブ
+  # 注: Render の Cron Job に無料プランはない。plan: starter は実行時間課金（1日数十秒/回なので実質数十円/月程度）。
   - type: cron
     name: task-agents-news-cron
     runtime: python
-    plan: free
+    plan: starter
     rootDir: backend
     schedule: "0 22 * * *"    # UTC 22:00 = 日本時間 翌07:00
     buildCommand: pip install -r requirements.txt
