@@ -268,16 +268,44 @@
   .charcard.on{border-color:var(--accent);background:var(--accent-wash)}
   .charname{font-weight:800;font-size:12.5px;color:var(--ink)}
   .charline{font-size:11px;color:var(--muted);line-height:1.4;margin-top:2px}
-  .monster{position:relative;width:44px;height:44px;border-radius:46% 54% 58% 42%/54% 46% 54% 46%;display:flex;align-items:center;justify-content:center;gap:3px;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.16)}
-  .monster .eye{width:11px;height:11px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
+  .monster{position:relative;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.16)}
+  /* 目：配置パターンごとにレイアウトを大きく変える */
+  .monster .eyewrap{position:relative;display:flex;align-items:center;justify-content:center}
+  .monster .eyewrap.pair{gap:4px}
+  .monster .eyewrap.stack{flex-direction:column;gap:3px}
+  .monster .eyewrap.tri{width:26px;height:22px}
+  .monster .eyewrap.tri .eye{position:absolute}
+  .monster .eyewrap.tri .eye:nth-child(1){top:0;left:1px}
+  .monster .eyewrap.tri .eye:nth-child(2){top:0;right:1px}
+  .monster .eyewrap.tri .eye:nth-child(3){bottom:0;left:50%;transform:translateX(-50%)}
+  .monster .eye{width:11px;height:11px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08);flex-shrink:0}
   .monster .eye i{width:5px;height:5px;border-radius:50%;background:#141A2E;display:block}
-  .monster .horn{position:absolute;top:-7px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:10px solid var(--horncolor,#fff)}
-  .monster .spot{position:absolute;border-radius:50%;opacity:.5}
-  .monster .mouth{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);width:14px;height:6px;border-radius:0 0 10px 10px;background:rgba(0,0,0,.28)}
-  .monster.sm{width:20px;height:20px;box-shadow:none;gap:1px;margin-right:6px;vertical-align:-6px}
-  .monster.sm .eye{width:6px;height:6px}
-  .monster.sm .eye i{width:2.5px;height:2.5px}
-  .monster.sm .horn,.monster.sm .spot,.monster.sm .mouth{display:none}
+  .monster .eye.big{width:18px;height:18px}
+  .monster .eye.big i{width:8px;height:8px}
+  /* 角・触覚：種類ごとに違う突起 */
+  .monster .horn{position:absolute;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent}
+  .monster .h-single{top:-9px;left:50%;transform:translateX(-50%);border-left-width:6px;border-right-width:6px;border-bottom-width:11px;border-bottom-style:solid}
+  .monster .h-twin-l{top:-6px;left:24%;transform:translateX(-50%) rotate(-16deg);border-bottom-width:8px;border-bottom-style:solid}
+  .monster .h-twin-r{top:-6px;left:76%;transform:translateX(-50%) rotate(16deg);border-bottom-width:8px;border-bottom-style:solid}
+  .monster .h-ridge{position:absolute;top:-5px;transform:translateX(-50%);border-bottom-width:7px;border-bottom-style:solid;border-left-width:3.5px;border-right-width:3.5px}
+  .monster .antenna{position:absolute;top:-9px;left:50%;transform:translateX(-50%);width:2.5px;height:9px;border-radius:2px}
+  .monster .antenna i{position:absolute;top:-7px;left:50%;transform:translateX(-50%);width:7px;height:7px;border-radius:50%;display:block}
+  /* 口：種類ごとに形を変える */
+  .monster .mouth{position:absolute;bottom:6px;left:50%;transform:translateX(-50%)}
+  .monster .mouth.smile{width:14px;height:6px;border-radius:0 0 10px 10px;background:rgba(0,0,0,.28)}
+  .monster .mouth.grin{width:18px;height:8px;border-radius:0 0 9px 9px;background:rgba(0,0,0,.3);display:flex;justify-content:center;gap:4px;padding-top:1px}
+  .monster .mouth.grin i{width:3px;height:4px;background:#fff;border-radius:0 0 2px 2px}
+  .monster .mouth.o{width:7px;height:7px;border-radius:50%;background:rgba(0,0,0,.32)}
+  .monster .mouth.fang{width:12px;height:5px;border-radius:0 0 8px 8px;background:rgba(0,0,0,.28)}
+  .monster .mouth.fang i{position:absolute;top:1px;right:-1px;width:3px;height:5px;background:#fff;border-radius:0 0 2px 2px}
+  /* 小サイズ（一覧チップ用）：角・口は省略し、目の数だけで見分けられるように簡略化 */
+  .monster.sm{width:20px!important;height:20px!important;border-radius:50%!important;box-shadow:none;margin-right:6px;vertical-align:-6px}
+  .monster.sm .horn,.monster.sm .antenna,.monster.sm .mouth{display:none}
+  .monster.sm .eyewrap{gap:2px!important;flex-direction:row!important;width:auto!important;height:auto!important;position:static!important}
+  .monster.sm .eyewrap .eye{position:static!important;width:6px;height:6px}
+  .monster.sm .eyewrap .eye i{width:2.5px;height:2.5px}
+  .monster.sm .eyewrap .eye.big{width:8px;height:8px}
+  .monster.sm .eyewrap .eye.big i{width:3.5px;height:3.5px}
   /* request form / review queue */
   .reqfield{margin-bottom:14px;text-align:left}
   .reqfield label{display:block;font-size:12px;font-weight:800;color:var(--muted);margin-bottom:6px}
@@ -602,25 +630,65 @@ const tagCount=tag=>ALLTASKS().filter(t=>tagsOf(t.id).includes(tag)).length;
 
 /* パーソナライズ: 業界・職種で辞書を最適化。職種→おすすめ業務カテゴリに対応。 */
 const INDUSTRIES=["IT・ソフトウェア","建設・不動産","製造","小売・EC","医療・介護","士業・コンサル","教育","飲食・サービス","その他"];
-/* 業種キャラクター: 「かわいいモンスター」という一般的なジャンル表現（丸い体・目・角）だけを借りたオリジナル生成。
-   特定のキャラクターの意匠（配色・形状の組み合わせ）は模倣しない。 */
+/* 業種キャラクター: 「かわいいモンスター」という一般的なジャンル表現（体・目・角・質感）だけを借りたオリジナル生成。
+   特定作品のキャラクター意匠（配色・形状・質感の組み合わせ）は模倣せず、業種ごとに体形/質感/角/目/口を変えて
+   見分けやすくしている。名前は付けず、業種名そのものをラベルにする。 */
 const INDUSTRY_CHAR={
-  "IT・ソフトウェア":{name:"テック之助",color:"#5B4BE1",spot:"#8b7bf0",eyes:2,horn:true,line:"議事録も仕様書も、コードを書く前に片付けたい"},
-  "建設・不動産":{name:"棟梁のマサさん",color:"#EA580C",spot:"#c2410c",eyes:1,horn:true,line:"現場も見積もりも書類も、ひとりで回してます"},
-  "製造":{name:"工場長のタクマさん",color:"#64748B",spot:"#475569",eyes:3,horn:false,line:"品質もコストも、記録に残せば怖くない"},
-  "小売・EC":{name:"店長のミサキさん",color:"#FF6B4A",spot:"#c0392b",eyes:2,horn:false,line:"接客もSNSも在庫も、一人三役です"},
-  "医療・介護":{name:"看護師のあゆみさん",color:"#12B76A",spot:"#0d8a52",eyes:2,horn:false,line:"記録に追われる時間を、ケアの時間に変えたい"},
-  "士業・コンサル":{name:"顧問のリョウさん",color:"#334155",spot:"#1e293b",eyes:1,horn:false,line:"契約書の一次チェックは、先にAIにやらせたい"},
-  "教育":{name:"先生のなつみさん",color:"#8B5CF6",spot:"#6d28d9",eyes:2,horn:true,line:"授業準備と事務作業、半分は自動化したい"},
-  "飲食・サービス":{name:"オーナーシェフのケンさん",color:"#F59E0B",spot:"#d97706",eyes:2,horn:false,line:"厨房に立つ時間を、書類仕事より増やしたい"},
-  "その他":{name:"なんでも屋のユウさん",color:"#0D9488",spot:"#0f766e",eyes:3,horn:true,line:"決まった型がなくても、近い業務からでOK"},
+  "IT・ソフトウェア": {color:"#5B4BE1",shape:"round", texture:"solid",  horn:"twin",    eyeLayout:"pair",      mouth:"smile", line:"議事録も仕様書も、コードを書く前に片付けたい"},
+  "建設・不動産":     {color:"#EA580C",shape:"wide",  texture:"stripe", horn:"single",  eyeLayout:"singleBig", mouth:"grin",  line:"現場も見積もりも書類も、ひとりで回してます"},
+  "製造":             {color:"#64748B",shape:"egg",   texture:"solid",  horn:"ridge",   eyeLayout:"triangle",  mouth:"smile", line:"品質もコストも、記録に残せば怖くない"},
+  "小売・EC":         {color:"#FF6B4A",shape:"blob",  texture:"dot",    horn:"none",    eyeLayout:"pair",      mouth:"grin",  line:"接客もSNSも在庫も、一人三役です"},
+  "医療・介護":       {color:"#12B76A",shape:"round",  texture:"fuzzy",  horn:"antenna", eyeLayout:"stack",     mouth:"o",     line:"記録に追われる時間を、ケアの時間に変えたい"},
+  "士業・コンサル":   {color:"#334155",shape:"tall",  texture:"solid",  horn:"none",    eyeLayout:"singleBig", mouth:"smile", line:"契約書の一次チェックは、先にAIにやらせたい"},
+  "教育":             {color:"#8B5CF6",shape:"blob",  texture:"solid",  horn:"twin",    eyeLayout:"pair",      mouth:"fang",  line:"授業準備と事務作業、半分は自動化したい"},
+  "飲食・サービス":   {color:"#F59E0B",shape:"wide",  texture:"dot",    horn:"single",  eyeLayout:"pair",      mouth:"grin",  line:"厨房に立つ時間を、書類仕事より増やしたい"},
+  "その他":           {color:"#0D9488",shape:"egg",   texture:"stripe", horn:"antenna", eyeLayout:"triangle",  mouth:"smile", line:"決まった型がなくても、近い業務からでOK"},
 };
+const MONSTER_SHAPE={
+  round:{br:"46% 54% 58% 42%/54% 46% 54% 46%",w:44,h:44},
+  wide: {br:"50%/38% 38% 62% 62%",w:52,h:36},
+  egg:  {br:"50%/58% 58% 42% 42%",w:40,h:50},
+  blob: {br:"42% 58% 60% 40%/58% 42% 58% 42%",w:44,h:44},
+  tall: {br:"50%/64% 64% 36% 36%",w:36,h:52},
+};
+const MONSTER_TEXTURE={
+  solid: c=>c,
+  fuzzy: c=>`radial-gradient(circle at 34% 28%, rgba(255,255,255,.4), transparent 55%), ${c}`,
+  dot:   c=>`radial-gradient(rgba(255,255,255,.35) 20%, transparent 21%) 0 0/9px 9px, ${c}`,
+  stripe:c=>`repeating-linear-gradient(45deg, rgba(255,255,255,.2) 0 5px, transparent 5px 10px), ${c}`,
+};
+function hornHTML(kind,spot){
+  if(kind==="single")return `<span class="horn h-single" style="border-bottom-color:${spot}"></span>`;
+  if(kind==="twin")return `<span class="horn h-twin-l" style="border-bottom-color:${spot}"></span><span class="horn h-twin-r" style="border-bottom-color:${spot}"></span>`;
+  if(kind==="ridge")return [0,1,2].map(i=>`<span class="horn h-ridge" style="border-bottom-color:${spot};left:${28+i*16}%"></span>`).join("");
+  if(kind==="antenna")return `<span class="antenna" style="background:${spot}"><i style="background:${spot}"></i></span>`;
+  return "";
+}
+function eyesHTML(layout){
+  const eye=`<span class="eye"><i></i></span>`;
+  const bigEye=`<span class="eye big"><i></i></span>`;
+  if(layout==="singleBig")return `<span class="eyewrap center">${bigEye}</span>`;
+  if(layout==="stack")return `<span class="eyewrap stack">${eye}${eye}</span>`;
+  if(layout==="triangle")return `<span class="eyewrap tri">${eye}${eye}${eye}</span>`;
+  return `<span class="eyewrap pair">${eye}${eye}</span>`;
+}
+function mouthHTML(kind){
+  if(kind==="grin")return `<span class="mouth grin"><i></i><i></i></span>`;
+  if(kind==="o")return `<span class="mouth o"></span>`;
+  if(kind==="fang")return `<span class="mouth fang"><i></i></span>`;
+  return `<span class="mouth smile"></span>`;
+}
 /* モンスター風アバターをその場で組み立てる（画像素材不使用・毎回ジャンル表現から生成） */
 function monsterHTML(c,small){
-  const eyesHtml=Array.from({length:c.eyes}).map(()=>`<span class="eye"><i></i></span>`).join("");
-  const hornHtml=c.horn?`<span class="horn" style="--horncolor:${c.spot}"></span>`:"";
-  const spotHtml=c.eyes>=3?"":`<span class="spot" style="background:${c.spot};width:6px;height:6px;top:8px;right:6px"></span><span class="spot" style="background:${c.spot};width:4px;height:4px;bottom:10px;left:7px"></span>`;
-  return `<span class="monster${small?" sm":""}" style="background:${c.color}">${hornHtml}${eyesHtml}${spotHtml}<span class="mouth"></span></span>`;
+  const s=MONSTER_SHAPE[c.shape];
+  const bg=MONSTER_TEXTURE[c.texture](c.color);
+  const style=small?"":`width:${s.w}px;height:${s.h}px;border-radius:${s.br};background:${bg}`;
+  return `<span class="monster${small?" sm":""}" style="${style}">${hornHTML(c.horn,shadeColor(c.color))}${eyesHTML(c.eyeLayout)}${mouthHTML(c.mouth)}</span>`;
+}
+function shadeColor(hex){
+  const n=parseInt(hex.slice(1),16);
+  const r=Math.max(0,(n>>16)-30),g=Math.max(0,((n>>8)&255)-30),b=Math.max(0,(n&255)-30);
+  return `rgb(${r},${g},${b})`;
 }
 const ROLES=[
   {key:"sales",label:"営業",cat:"SP01"},{key:"mkt",label:"マーケティング",cat:"CM01"},
@@ -1447,7 +1515,7 @@ function renderProfile(){
   const c1=el("div","charcards");INDUSTRIES.forEach(ind=>{
     const ic=INDUSTRY_CHAR[ind];
     const b=el("button","charcard"+(p.industry===ind?" on":""));
-    b.innerHTML=`${monsterHTML(ic,false)}<span><span class="charname">${ic.name}</span><span class="charline">${ic.line}</span></span>`;
+    b.innerHTML=`${monsterHTML(ic,false)}<span><span class="charname">${ind}</span><span class="charline">${ic.line}</span></span>`;
     b.onclick=()=>{p.industry=(p.industry===ind?null:ind);setProfile(p);renderProfile();};
     c1.appendChild(b);
   });g1.appendChild(c1);v.appendChild(g1);
