@@ -681,8 +681,10 @@ let owned=new Set(JSON.parse(localStorage.getItem(OKEY)||"[]"));
 const saveOwned=()=>localStorage.setItem(OKEY,JSON.stringify([...owned]));
 /* 料金プラン・利用回数（フロントで完結。本番はサーバー側の課金判定に置換） */
 const PLAN_KEY="task-plan-v1",USAGE_KEY="task-usage-v1",FREE_LIMIT=1,STD_LIMIT=5;
+/* プレミアムは表示上「無制限」だが、原価保護のためのフェアユース上限（非表示）。通常利用では到達しない想定。 */
+const PREMIUM_FAIR_USE_LIMIT=1000;
 const getPlan=()=>localStorage.getItem(PLAN_KEY)||"free";
-const limitFor=p=>p==="premium"?Infinity:(p==="standard"?STD_LIMIT:FREE_LIMIT);
+const limitFor=p=>p==="premium"?PREMIUM_FAIR_USE_LIMIT:(p==="standard"?STD_LIMIT:FREE_LIMIT);
 const setPlan=p=>{localStorage.setItem(PLAN_KEY,p);updatePlanChip();};
 const getUsage=()=>parseInt(localStorage.getItem(USAGE_KEY)||"0",10);
 const setUsage=n=>{localStorage.setItem(USAGE_KEY,String(n));updatePlanChip();};
@@ -1117,7 +1119,7 @@ function renderFlow(){
   $("#wfGo").onclick=async()=>{
     if(!isSubscriber()){openModal("🔒 ワークフロー実行は契約者限定です","連携ワークフローの実行は有料プラン（標準・プレミアム）でご利用いただけます。",`<button class="btn get" id="toPlansWf">プランを見てアップグレード</button>`);const b=$("#toPlansWf");if(b)b.onclick=()=>{$("#mscrim").classList.remove("on");state.route="plans";renderAll();window.scrollTo(0,0);};return;}
     if(getUsage()>=limitFor(getPlan())){openUpsell();return;}
-    if(getPlan()!=="premium")setUsage(getUsage()+1);
+    setUsage(getUsage()+1);
     const input=($("#wfIn").value||"").trim();const out=$("#wfOut");out.style.display="block";
     let text;
     if(conn){text=await callAgentApi(`/v1/workflows/${w.id}/run`,{input},out);}
@@ -1323,7 +1325,13 @@ function openRun(t){
   };
 }
 function openUpsell(){
-  const plan=getPlan();const lim=limitFor(plan);
+  const plan=getPlan();
+  if(plan==="premium"){
+    openModal("🙏 想定を超えるご利用です","プレミアムプランの通常利用範囲を大きく超えるご利用を検知しました。チーム利用など大規模なご利用をご検討の場合は、個別プランをご案内します。",
+      `<p style="font-size:13.5px;color:var(--muted);line-height:1.7">ご不便をおかけしますが、いったんこの画面で今月分の実行を停止しています。お手数ですが運営までご連絡ください。</p>`);
+    return;
+  }
+  const lim=limitFor(plan);
   const head=plan==="free"?`無料プランのお試し上限（月${lim}本）`:`標準プランの上限（月${lim}本）`;
   openModal("⬆️ 今月の上限に達しました",`${head}に達しました。アップグレードでもっと使えます。`,
     plan==="free"
