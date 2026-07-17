@@ -261,6 +261,23 @@
   .pgroup{margin-bottom:22px;max-width:720px}
   .pgroup .pl{font-size:13px;font-weight:800;margin-bottom:10px;display:flex;align-items:center;gap:8px}
   .pchips{display:flex;gap:8px;flex-wrap:wrap}
+  /* 業種キャラクター：かわいいモンスター（丸い体・目・角）というジャンル表現のみ借りたオリジナル生成。特定作品のキャラは模倣しない。 */
+  .charcards{display:flex;gap:10px;flex-wrap:wrap}
+  .charcard{display:flex;align-items:center;gap:10px;padding:9px 14px 9px 9px;border:1.5px solid var(--line);border-radius:16px;background:#fff;cursor:pointer;transition:.15s;text-align:left;max-width:236px}
+  .charcard:hover{border-color:var(--accent);transform:translateY(-1px)}
+  .charcard.on{border-color:var(--accent);background:var(--accent-wash)}
+  .charname{font-weight:800;font-size:12.5px;color:var(--ink)}
+  .charline{font-size:11px;color:var(--muted);line-height:1.4;margin-top:2px}
+  .monster{position:relative;width:44px;height:44px;border-radius:46% 54% 58% 42%/54% 46% 54% 46%;display:flex;align-items:center;justify-content:center;gap:3px;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.16)}
+  .monster .eye{width:11px;height:11px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
+  .monster .eye i{width:5px;height:5px;border-radius:50%;background:#141A2E;display:block}
+  .monster .horn{position:absolute;top:-7px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:10px solid var(--horncolor,#fff)}
+  .monster .spot{position:absolute;border-radius:50%;opacity:.5}
+  .monster .mouth{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);width:14px;height:6px;border-radius:0 0 10px 10px;background:rgba(0,0,0,.28)}
+  .monster.sm{width:20px;height:20px;box-shadow:none;gap:1px;margin-right:6px;vertical-align:-6px}
+  .monster.sm .eye{width:6px;height:6px}
+  .monster.sm .eye i{width:2.5px;height:2.5px}
+  .monster.sm .horn,.monster.sm .spot,.monster.sm .mouth{display:none}
   /* request form / review queue */
   .reqfield{margin-bottom:14px;text-align:left}
   .reqfield label{display:block;font-size:12px;font-weight:800;color:var(--muted);margin-bottom:6px}
@@ -585,6 +602,26 @@ const tagCount=tag=>ALLTASKS().filter(t=>tagsOf(t.id).includes(tag)).length;
 
 /* パーソナライズ: 業界・職種で辞書を最適化。職種→おすすめ業務カテゴリに対応。 */
 const INDUSTRIES=["IT・ソフトウェア","建設・不動産","製造","小売・EC","医療・介護","士業・コンサル","教育","飲食・サービス","その他"];
+/* 業種キャラクター: 「かわいいモンスター」という一般的なジャンル表現（丸い体・目・角）だけを借りたオリジナル生成。
+   特定のキャラクターの意匠（配色・形状の組み合わせ）は模倣しない。 */
+const INDUSTRY_CHAR={
+  "IT・ソフトウェア":{name:"テック之助",color:"#5B4BE1",spot:"#8b7bf0",eyes:2,horn:true,line:"議事録も仕様書も、コードを書く前に片付けたい"},
+  "建設・不動産":{name:"棟梁のマサさん",color:"#EA580C",spot:"#c2410c",eyes:1,horn:true,line:"現場も見積もりも書類も、ひとりで回してます"},
+  "製造":{name:"工場長のタクマさん",color:"#64748B",spot:"#475569",eyes:3,horn:false,line:"品質もコストも、記録に残せば怖くない"},
+  "小売・EC":{name:"店長のミサキさん",color:"#FF6B4A",spot:"#c0392b",eyes:2,horn:false,line:"接客もSNSも在庫も、一人三役です"},
+  "医療・介護":{name:"看護師のあゆみさん",color:"#12B76A",spot:"#0d8a52",eyes:2,horn:false,line:"記録に追われる時間を、ケアの時間に変えたい"},
+  "士業・コンサル":{name:"顧問のリョウさん",color:"#334155",spot:"#1e293b",eyes:1,horn:false,line:"契約書の一次チェックは、先にAIにやらせたい"},
+  "教育":{name:"先生のなつみさん",color:"#8B5CF6",spot:"#6d28d9",eyes:2,horn:true,line:"授業準備と事務作業、半分は自動化したい"},
+  "飲食・サービス":{name:"オーナーシェフのケンさん",color:"#F59E0B",spot:"#d97706",eyes:2,horn:false,line:"厨房に立つ時間を、書類仕事より増やしたい"},
+  "その他":{name:"なんでも屋のユウさん",color:"#0D9488",spot:"#0f766e",eyes:3,horn:true,line:"決まった型がなくても、近い業務からでOK"},
+};
+/* モンスター風アバターをその場で組み立てる（画像素材不使用・毎回ジャンル表現から生成） */
+function monsterHTML(c,small){
+  const eyesHtml=Array.from({length:c.eyes}).map(()=>`<span class="eye"><i></i></span>`).join("");
+  const hornHtml=c.horn?`<span class="horn" style="--horncolor:${c.spot}"></span>`:"";
+  const spotHtml=c.eyes>=3?"":`<span class="spot" style="background:${c.spot};width:6px;height:6px;top:8px;right:6px"></span><span class="spot" style="background:${c.spot};width:4px;height:4px;bottom:10px;left:7px"></span>`;
+  return `<span class="monster${small?" sm":""}" style="background:${c.color}">${hornHtml}${eyesHtml}${spotHtml}<span class="mouth"></span></span>`;
+}
 const ROLES=[
   {key:"sales",label:"営業",cat:"SP01"},{key:"mkt",label:"マーケティング",cat:"CM01"},
   {key:"admin",label:"経理・総務・人事",cat:"SP02"},{key:"data",label:"データ・分析",cat:"CM06"},
@@ -909,7 +946,9 @@ function renderLibrary(){
   indbar.appendChild(el("span","tl","業種で絞り込み:"));
   const curInd=getProfile().industry;
   INDUSTRIES.forEach(ind=>{
-    const b=el("button","tagchip"+(curInd===ind?" on":""),ind);
+    const ic=INDUSTRY_CHAR[ind];
+    const b=el("button","tagchip"+(curInd===ind?" on":""));
+    b.innerHTML=`${monsterHTML(ic,true)}${ind}`;
     b.onclick=()=>{const pp=getProfile();pp.industry=(pp.industry===ind?null:ind);setProfile(pp);renderAll();window.scrollTo(0,0);};
     indbar.appendChild(b);
   });
@@ -1405,7 +1444,13 @@ function renderProfile(){
   const head=el("div","libhead");head.innerHTML=`<h1><span>🎯</span> パーソナライズ設定</h1>`;v.appendChild(head);
   v.appendChild(el("p","libsub","あなたの<b>業界・職種・関心</b>に合わせて、おすすめエージェントや情報を最適化します。選ぶと自動保存されます。"));
   const g1=el("div","pgroup");g1.appendChild(el("div","pl","🏢 業界（1つ）"));
-  const c1=el("div","pchips");INDUSTRIES.forEach(ind=>{const b=el("button","tagchip"+(p.industry===ind?" on":""),ind);b.onclick=()=>{p.industry=(p.industry===ind?null:ind);setProfile(p);renderProfile();};c1.appendChild(b);});g1.appendChild(c1);v.appendChild(g1);
+  const c1=el("div","charcards");INDUSTRIES.forEach(ind=>{
+    const ic=INDUSTRY_CHAR[ind];
+    const b=el("button","charcard"+(p.industry===ind?" on":""));
+    b.innerHTML=`${monsterHTML(ic,false)}<span><span class="charname">${ic.name}</span><span class="charline">${ic.line}</span></span>`;
+    b.onclick=()=>{p.industry=(p.industry===ind?null:ind);setProfile(p);renderProfile();};
+    c1.appendChild(b);
+  });g1.appendChild(c1);v.appendChild(g1);
   const g2=el("div","pgroup");g2.appendChild(el("div","pl","💼 職種（1つ）"));
   const c2=el("div","pchips");ROLES.forEach(r=>{const b=el("button","tagchip"+(p.role===r.key?" on":""),r.label);b.onclick=()=>{p.role=(p.role===r.key?null:r.key);setProfile(p);renderProfile();};c2.appendChild(b);});g2.appendChild(c2);v.appendChild(g2);
   const g3=el("div","pgroup");g3.appendChild(el("div","pl","🏷️ 関心のある“やること”（複数可）"));
