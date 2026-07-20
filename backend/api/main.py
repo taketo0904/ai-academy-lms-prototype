@@ -54,6 +54,7 @@ _news_store: list[dict] = []
 class RunRequest(BaseModel):
     input: str = ""
     context: str = ""  # 依頼者の会社・事業について（自由記述、任意）
+    messages: list[dict] = []  # 会話履歴 [{role:"user"|"assistant", content:"..."}]。指定時は input より優先（マイライブラリの会話継続用）
 
 
 class NewsItem(BaseModel):
@@ -103,12 +104,27 @@ def _run_collect(agent: dict, user_input: str, biz_context: str = "") -> str:
     return "".join(b.text for b in msg.content if b.type == "text")
 
 
+def _run_chat(agent: dict, messages: list[dict], biz_context: str = "") -> Iterator[str]:
+    """複数ターンの会話履歴をそのままClaudeに渡す（マイライブラリの会話継続用）。"""
+    with client.messages.stream(
+        model=agent["model"],
+        max_tokens=4096,
+        system=system_for(agent, biz_context),
+        messages=messages,
+    ) as stream:
+        for text in stream.text_stream:
+            yield text
+
+
 @app.post("/v1/agents/{agent_id}/run")
 def run_agent(agent_id: str, req: RunRequest, x_api_key: str | None = Header(default=None)):
     _auth(x_api_key)
     agent = AGENTS.get(agent_id)
     if not agent:
         raise HTTPException(status_code=404, detail="agent not found")
+    if req.messages:
+        msgs = [{"role": m.get("role", "user"), "content": m.get("content", "")} for m in req.messages if m.get("content")]
+        return StreamingResponse(_run_chat(agent, msgs, req.context), media_type="text/plain; charset=utf-8")
     return StreamingResponse(_run(agent, req.input, req.context), media_type="text/plain; charset=utf-8")
 
 

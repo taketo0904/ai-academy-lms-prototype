@@ -302,6 +302,14 @@
   .libcard .lcd{font-size:11px;color:var(--faint);flex-shrink:0}
   .libcard .lcbody{margin-top:12px}
   .libcard .lcacts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  /* エージェントとの会話（チャット形式・マイライブラリに自動保存） */
+  .chatthread{display:flex;flex-direction:column;gap:10px;max-height:320px;overflow-y:auto;padding:2px 2px 4px}
+  .chatmsg{max-width:88%;padding:10px 13px;border-radius:13px;font-size:13px;line-height:1.6;white-space:pre-wrap}
+  .chatmsg.user{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:3px}
+  .chatmsg.bot{align-self:flex-start;background:var(--canvas);border:1px solid var(--line);color:var(--ink);border-bottom-left-radius:3px}
+  .chatrow{display:flex;gap:8px;align-items:flex-end;margin-top:12px}
+  .chatrow textarea{flex:1;min-height:44px;max-height:120px}
+  .chatrow button{width:auto;padding:11px 18px;flex-shrink:0}
   .qitem{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:var(--shadow);max-width:760px}
   .qitem .qh{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:6px}
   .qitem .qname{font-size:15px;font-weight:800}
@@ -847,8 +855,19 @@ function addLibraryItem(kind,title,body,meta){
   arr.unshift(item);setLibrary(arr);return item;
 }
 function deleteLibraryItem(id){setLibrary(getLibrary().filter(x=>x.id!==id));}
+function upsertConversation(convId,title,messages,meta){
+  const arr=getLibrary();
+  const i=convId?arr.findIndex(x=>x.id===convId):-1;
+  if(i<0){
+    const item={id:"lib_"+Date.now()+"_"+Math.random().toString(36).slice(2,7),kind:"conversation",title,messages,createdAt:Date.now(),updatedAt:Date.now(),meta:meta||{}};
+    arr.unshift(item);setLibrary(arr);return item.id;
+  }
+  arr[i]={...arr[i],messages,updatedAt:Date.now()};
+  setLibrary(arr);return arr[i].id;
+}
 const libNotesCount=()=>getLibrary().filter(x=>x.kind==="note").length;
 const libOutputsCount=()=>getLibrary().filter(x=>x.kind==="output").length;
+const libConvCount=()=>getLibrary().filter(x=>x.kind==="conversation").length;
 function fmtDate(ts){
   const d=new Date(ts);
   return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
@@ -951,7 +970,7 @@ function renderSide(){
   nav.appendChild(gn);
   const g2=el("div","grp");g2.appendChild(el("div","ttl","マイページ"));
   const lib=el("button","navitem"+(state.route==="mylib"?" active":""));
-  const libN=libNotesCount()+libOutputsCount();
+  const libN=libNotesCount()+libOutputsCount()+libConvCount();
   lib.innerHTML=`<span class="ic">🗂️</span><span>マイライブラリ</span>`+(libN?`<span class="ct tnum">${libN}</span>`:`<span class="newtag">NEW</span>`);
   lib.onclick=()=>{state.route="mylib";renderAll();window.scrollTo(0,0);};
   g2.appendChild(lib);
@@ -1444,20 +1463,70 @@ function wireOutputActions(getText,filename,libTitle){
     const sv=$("#runSaved");if(sv)sv.style.display="block";
   }
 }
-function openRun(t){
+function chatBubbleHTML(role,content){
+  return `<div class="chatmsg ${role==="user"?"user":"bot"}">${(content||"").replace(/&/g,"&amp;").replace(/</g,"&lt;")}</div>`;
+}
+/* エージェント実行はチャット形式。やり取りは自動でマイライブラリの「会話」に保存され、あとで続きを話せる */
+function openRun(t,existingConv){
   const io=ioOf(t)||{in:"入力",out:"成果物"};const conn=apiConnected();
-  openModal(`🤖 ${t.agent.name} を実行`,conn?"本番APIに接続して実行します。":"未接続のためサンプル出力を表示します（設定でAPIを繋ぐと本物が動きます）。",
-    `<div class="reqfield"><label>入力（${io.in}）</label><textarea id="runIn" placeholder="ここに入力を貼り付け／入力してください"></textarea></div>
-     <button class="btn get" id="runGo">${conn?"実行する":"サンプルを表示"}</button>
-     <div class="output" id="outText" style="margin-top:14px;display:none"></div>
-     ${outputActions()}`);
-  $("#runGo").onclick=async()=>{
-    const input=($("#runIn").value||"").trim();const out=$("#outText");out.style.display="block";
-    let text;
-    if(conn){text=await callAgentApi(`/v1/agents/${t.id}/run`,{input,context:bizContext()},out);}
-    else{text=`【${t.name}】出力サンプル（プロトタイプ）\n\n― ${io.out} ―\n\n入力: ${input||"（未入力）"}\n\n※ 未接続のためサンプルです。設定でAPIを繋ぐと実際の成果物が生成されます。`;out.textContent=text;}
-    if(text)wireOutputActions(()=>out.textContent,`${t.name}.txt`,conn?t.name:null);
+  let convId=existingConv?existingConv.id:null;
+  let messages=existingConv?existingConv.messages.slice():[];
+  openModal(`🤖 ${t.agent.name} を実行`,conn?"本番APIに接続して会話できます。やり取りはマイライブラリに自動保存されます。":"未接続のためサンプル応答を表示します（設定でAPIを繋ぐと本物が動きます）。",
+    `<div class="chatthread" id="chatThread"></div>
+     <div class="reqfield" style="margin-bottom:0">
+       <label>${messages.length?"続きを入力":`入力（${io.in}）`}</label>
+       <div class="chatrow"><textarea id="chatIn" placeholder="ここに入力してください（Enterで送信／Shift+Enterで改行）"></textarea>
+       <button class="btn get" id="chatSend">${conn?"送信":"サンプル送信"}</button></div>
+     </div>
+     <div class="lcacts" id="chatActs" style="display:${messages.length?"flex":"none"};margin-top:12px">
+       <button class="btn get" id="chatCopy" style="flex:1">コピー</button>
+       <button class="btn use" id="chatTxt" style="flex:1;margin-top:0">📄 テキスト</button>
+       <button class="btn use" id="chatXls" style="flex:1;margin-top:0">📊 Excel</button>
+     </div>
+     <div id="chatSaved" style="display:${messages.length?"block":"none"};font-size:11.5px;color:var(--muted);margin-top:8px">📚 マイライブラリに自動保存しています</div>`);
+  const thread=$("#chatThread");
+  const renderThread=()=>{thread.innerHTML=messages.map(m=>chatBubbleHTML(m.role,m.content)).join("");thread.scrollTop=thread.scrollHeight;};
+  renderThread();
+  const transcript=()=>messages.map(m=>`${m.role==="user"?"【あなた】":`【${t.agent.name}】`}\n${m.content}`).join("\n\n");
+  const wireActs=()=>{
+    const acts=$("#chatActs");if(acts)acts.style.display=messages.length?"flex":"none";
+    const cp=$("#chatCopy");if(cp)cp.onclick=async()=>{try{await navigator.clipboard.writeText(transcript());toast("コピーしました");}catch(e){toast("コピーは公開URLで可能です","📋");}};
+    const dl=$("#chatTxt");if(dl)dl.onclick=()=>downloadText(`${t.agent.name}_会話.txt`,transcript());
+    const dx=$("#chatXls");if(dx)dx.onclick=()=>downloadCSV(`${t.agent.name}_会話.csv`,transcript());
   };
+  wireActs();
+  const send=async()=>{
+    const inp=$("#chatIn");const text=(inp.value||"").trim();if(!text)return;
+    inp.value="";inp.disabled=true;const btn=$("#chatSend");if(btn)btn.disabled=true;
+    messages.push({role:"user",content:text});renderThread();
+    if(conn){
+      thread.insertAdjacentHTML("beforeend",`<div class="chatmsg bot" id="chatPending">…</div>`);thread.scrollTop=thread.scrollHeight;
+      const pending=$("#chatPending");
+      const reply=await callAgentApi(`/v1/agents/${t.id}/run`,{messages,context:bizContext()},pending);
+      if(reply){
+        messages.push({role:"assistant",content:reply});
+        convId=upsertConversation(convId,t.agent.name,messages,{agentId:t.id,name:t.agent.name});
+        renderThread();wireActs();
+        const sv=$("#chatSaved");if(sv)sv.style.display="block";
+      }
+    }else{
+      const reply=`【${t.name}】サンプル応答（プロトタイプ）\n\n― ${io.out} ―\n\n入力: ${text}\n\n※ 未接続のためサンプルです。設定でAPIを繋ぐと実際に会話できます。`;
+      messages.push({role:"assistant",content:reply});
+      renderThread();wireActs();
+    }
+    inp.disabled=false;if(btn)btn.disabled=false;inp.focus();
+  };
+  $("#chatSend").onclick=send;
+  $("#chatIn").onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}};
+}
+/* マイライブラリの会話一覧から「続きを話す」で再開（新規エージェント実行と同じ利用回数ゲートを通す） */
+function continueConversation(conv){
+  const t=taskById(conv.meta&&conv.meta.agentId);
+  if(!t){toast("元のエージェントが見つかりませんでした（削除済みの可能性）");return;}
+  const plan=getPlan();
+  if(getUsage()>=limitFor(plan)){openUpsell();return;}
+  if(plan!=="premium")setUsage(getUsage()+1);
+  openRun(t,conv);
 }
 function openUpsell(){
   const plan=getPlan();
@@ -1620,21 +1689,44 @@ function libOutputCard(o){
   c.querySelector(".lcdel").onclick=e=>{e.preventDefault();if(confirm("この成果物を削除しますか？")){deleteLibraryItem(o.id);renderMyLibrary();}};
   return c;
 }
+function libConvCard(cv){
+  const c=el("div","libcard");
+  const last=cv.messages[cv.messages.length-1];
+  const preview=last?last.content.slice(0,90)+(last.content.length>90?"…":""):"";
+  c.innerHTML=`<details><summary><span class="lct">💬 ${cv.title}</span><span class="lcd">${fmtDate(cv.updatedAt||cv.createdAt)}</span></summary>
+    <div style="font-size:11px;color:var(--faint);margin:6px 0">${cv.messages.length}件のやり取り</div>
+    <div class="output lcbody">${preview.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</div>
+    <div class="lcacts">
+      <button class="btn get lccont" style="flex:1">💬 続きを話す</button>
+      <button class="btn use lcdel" style="flex:1;margin-top:0">🗑 削除</button>
+    </div></details>`;
+  c.querySelector(".lccont").onclick=e=>{e.preventDefault();continueConversation(cv);};
+  c.querySelector(".lcdel").onclick=e=>{e.preventDefault();if(confirm("この会話を削除しますか？")){deleteLibraryItem(cv.id);renderMyLibrary();}};
+  return c;
+}
 function renderMyLibrary(){
   const v=$("#view");v.innerHTML="";
   v.appendChild(el("div","crumb",`<b>マイページ</b> / マイライブラリ`));
   const head=el("div","libhead");head.innerHTML=`<h1><span>🗂️</span> マイライブラリ</h1>`;
   v.appendChild(head);
-  v.appendChild(el("p","libsub","あなた専用の場所です。気づいたことをメモに残せます。エージェントやワークフローを実行すると、成果物はここに自動で溜まっていきます。"));
+  v.appendChild(el("p","libsub","あなた専用の場所です。気づいたことをメモに残せます。エージェントと会話したり実行したりすると、そのやり取りと成果物がここに自動で溜まっていきます。"));
 
   const tabs=el("div","seg");tabs.style.cssText="display:inline-flex;margin-bottom:16px";
-  tabs.innerHTML=`<button class="${state.libTab!=="output"?"active":""}" data-t="note">📝 メモ (${libNotesCount()})</button><button class="${state.libTab==="output"?"active":""}" data-t="output">📦 成果物 (${libOutputsCount()})</button>`;
+  tabs.innerHTML=`<button class="${state.libTab==="note"?"active":""}" data-t="note">📝 メモ (${libNotesCount()})</button><button class="${state.libTab==="conversation"?"active":""}" data-t="conversation">💬 会話 (${libConvCount()})</button><button class="${state.libTab==="output"?"active":""}" data-t="output">📦 成果物 (${libOutputsCount()})</button>`;
   tabs.querySelectorAll("button").forEach(b=>b.onclick=()=>{state.libTab=b.dataset.t;renderMyLibrary();});
   v.appendChild(tabs);
 
   const wrap=el("div");wrap.style.maxWidth="760px";
 
-  if(state.libTab!=="output"){
+  if(state.libTab==="conversation"){
+    const convs=getLibrary().filter(x=>x.kind==="conversation");
+    if(!convs.length)wrap.appendChild(el("p","libsub","エージェントと会話すると、ここに自動で溜まっていきます。"));
+    convs.forEach(cv=>wrap.appendChild(libConvCard(cv)));
+  }else if(state.libTab==="output"){
+    const outs=getLibrary().filter(x=>x.kind==="output");
+    if(!outs.length)wrap.appendChild(el("p","libsub","エージェントを実行すると、ここに成果物が自動で溜まっていきます。"));
+    outs.forEach(o=>wrap.appendChild(libOutputCard(o)));
+  }else{
     const box=el("div","reqfield");
     box.innerHTML=`<label>新しいメモ</label>
       <input id="noteTitle" placeholder="タイトル（任意）" style="margin-bottom:8px">
@@ -1644,10 +1736,6 @@ function renderMyLibrary(){
     const notes=getLibrary().filter(x=>x.kind==="note");
     if(!notes.length)wrap.appendChild(el("p","libsub","まだメモはありません。"));
     notes.forEach(n=>wrap.appendChild(libNoteCard(n)));
-  }else{
-    const outs=getLibrary().filter(x=>x.kind==="output");
-    if(!outs.length)wrap.appendChild(el("p","libsub","エージェントを実行すると、ここに成果物が自動で溜まっていきます。"));
-    outs.forEach(o=>wrap.appendChild(libOutputCard(o)));
   }
   v.appendChild(wrap);
 
