@@ -785,7 +785,7 @@ const OKEY="task-agents-owned-v2";
 let owned=new Set(JSON.parse(localStorage.getItem(OKEY)||"[]"));
 const saveOwned=()=>localStorage.setItem(OKEY,JSON.stringify([...owned]));
 /* 料金プラン・利用回数（フロントで完結。本番はサーバー側の課金判定に置換） */
-const PLAN_KEY="task-plan-v1",USAGE_KEY="task-usage-v1",FREE_LIMIT=1,STD_LIMIT=5;
+const PLAN_KEY="task-plan-v1",USAGE_KEY="task-usage-v1",FREE_LIMIT=1,STD_LIMIT=80;
 /* プレミアムは表示上「無制限」だが、原価保護のためのフェアユース上限（非表示）。通常利用では到達しない想定。 */
 const PREMIUM_FAIR_USE_LIMIT=1000;
 const getPlan=()=>localStorage.getItem(PLAN_KEY)||"free";
@@ -1442,7 +1442,7 @@ function openUpsell(){
   const head=plan==="free"?`無料プランのお試し上限（月${lim}本）`:`標準プランの上限（月${lim}本）`;
   openModal("⬆️ 今月の上限に達しました",`${head}に達しました。アップグレードでもっと使えます。`,
     plan==="free"
-    ?`<button class="btn get" id="upStd">標準プランにする（月5本・¥4,980）</button><button class="btn use" id="upPrem" style="margin-top:8px">プレミアム（無制限・¥9,800）</button>`
+    ?`<button class="btn get" id="upStd">標準プランにする（月${STD_LIMIT}本・¥4,980）</button><button class="btn use" id="upPrem" style="margin-top:8px">プレミアム（無制限・¥9,800）</button>`
     :`<button class="btn get" id="upPrem">プレミアムにアップグレード（¥9,800/月）</button>`);
   const s=$("#upStd");if(s)s.onclick=()=>{setPlan("standard");$("#mscrim").classList.remove("on");toast("標準プランにしました");renderAll();};
   const pr=$("#upPrem");if(pr)pr.onclick=()=>{setPlan("premium");$("#mscrim").classList.remove("on");toast("プレミアムにアップグレードしました","💎");renderAll();};
@@ -1493,7 +1493,7 @@ function renderFree(){
   status.innerHTML=`<h3>🧪 お試しの状況</h3><div class="pbar"><i style="width:${Math.min(100,used/FREE_LIMIT*100)}%"></i></div><div style="font-size:12.5px;color:var(--muted);margin-top:8px" class="tnum">今月 ${used}/${FREE_LIMIT} 本 ・ 残り ${remain} 本</div>`;
   v.appendChild(status);
   const cmp=el("div","pgroup");
-  cmp.innerHTML=`<div class="pl">🔓 無料でできること</div><ul style="margin:0 0 14px;padding-left:20px;font-size:13.5px;color:var(--slate);line-height:1.9"><li>業務エージェント辞書の閲覧・検索・タグ横断</li><li>時事ニュース（鮮度情報）の閲覧</li><li>使い方レクチャー（初級〜上級）</li><li>AIエージェントの実行 月${FREE_LIMIT}本お試し</li></ul><div class="pl">🔒 有料で解放されること</div><ul style="margin:0;padding-left:20px;font-size:13.5px;color:var(--muted);line-height:1.9"><li>エージェント実行回数（標準 月5本／プレミアム 無制限）</li><li>成果物のダウンロード上限の解放</li><li>連携ワークフロー・パーソナライズのフル利用</li></ul>`;
+  cmp.innerHTML=`<div class="pl">🔓 無料でできること</div><ul style="margin:0 0 14px;padding-left:20px;font-size:13.5px;color:var(--slate);line-height:1.9"><li>業務エージェント辞書の閲覧・検索・タグ横断</li><li>時事ニュース（鮮度情報）の閲覧</li><li>使い方レクチャー（初級〜上級）</li><li>AIエージェントの実行 月${FREE_LIMIT}本お試し</li></ul><div class="pl">🔒 有料で解放されること</div><ul style="margin:0;padding-left:20px;font-size:13.5px;color:var(--muted);line-height:1.9"><li>エージェント実行回数（標準 月${STD_LIMIT}本／プレミアム 無制限）</li><li>成果物のダウンロード上限の解放</li><li>連携ワークフロー・パーソナライズのフル利用</li></ul>`;
   v.appendChild(cmp);
   const up=el("button","planbtn up","💳 プランを見てアップグレード");up.style.cssText="width:auto;padding:12px 20px;margin-top:4px";up.onclick=()=>{state.route="plans";renderAll();window.scrollTo(0,0);};
   v.appendChild(up);
