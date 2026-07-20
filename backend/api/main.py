@@ -1,8 +1,9 @@
 """
 サービス側API（プラットフォーム内完結エージェント実行）。
 
-- 単体エージェント:   POST /v1/agents/{id}/run     body {"input": "..."}  → ストリーミング(text/plain)
-- 連携ワークフロー:   POST /v1/workflows/{id}/run  body {"input": "..."}  → 各ステップを直列連携
+- 単体エージェント:   POST /v1/agents/{id}/run     body {"input": "...", "context": "..."}  → ストリーミング(text/plain)
+- 連携ワークフロー:   POST /v1/workflows/{id}/run  body {"input": "...", "context": "..."}  → 各ステップを直列連携
+  ※ context はユーザーの会社・事業に関する自由記述（パーソナライズ設定）。system プロンプトに含めて成果物の質を上げる。
 - ニュース投稿:       POST /v1/news/ingest         body {"items": [...]}  → cronジョブ専用（要 x-api-key = CRON_KEY）
 - ニュース取得:       GET  /v1/news/latest         → フロントの時事ニュースが参照
 - ヘルス:             GET  /healthz
@@ -52,6 +53,7 @@ _news_store: list[dict] = []
 
 class RunRequest(BaseModel):
     input: str = ""
+    context: str = ""  # 依頼者の会社・事業について（自由記述、任意）
 
 
 class NewsItem(BaseModel):
@@ -79,22 +81,22 @@ def _auth_cron(x_api_key: str | None) -> None:
         raise HTTPException(status_code=401, detail="invalid cron key")
 
 
-def _run(agent: dict, user_input: str) -> Iterator[str]:
+def _run(agent: dict, user_input: str, biz_context: str = "") -> Iterator[str]:
     with client.messages.stream(
         model=agent["model"],
         max_tokens=4096,
-        system=system_for(agent),
+        system=system_for(agent, biz_context),
         messages=[{"role": "user", "content": user_input or "（入力なし）サンプルを1つ生成してください。"}],
     ) as stream:
         for text in stream.text_stream:
             yield text
 
 
-def _run_collect(agent: dict, user_input: str) -> str:
+def _run_collect(agent: dict, user_input: str, biz_context: str = "") -> str:
     with client.messages.stream(
         model=agent["model"],
         max_tokens=4096,
-        system=system_for(agent),
+        system=system_for(agent, biz_context),
         messages=[{"role": "user", "content": user_input}],
     ) as stream:
         msg = stream.get_final_message()
@@ -107,7 +109,7 @@ def run_agent(agent_id: str, req: RunRequest, x_api_key: str | None = Header(def
     agent = AGENTS.get(agent_id)
     if not agent:
         raise HTTPException(status_code=404, detail="agent not found")
-    return StreamingResponse(_run(agent, req.input), media_type="text/plain; charset=utf-8")
+    return StreamingResponse(_run(agent, req.input, req.context), media_type="text/plain; charset=utf-8")
 
 
 @app.post("/v1/workflows/{wf_id}/run")
@@ -123,7 +125,7 @@ def run_workflow(wf_id: str, req: RunRequest, x_api_key: str | None = Header(def
         for i, sid in enumerate(wf["steps"], 1):
             agent = AGENTS[sid]
             yield f"\n▼ STEP {i} {agent['name']}\n"
-            out = _run_collect(agent, payload)
+            out = _run_collect(agent, payload, req.context)
             yield out + "\n"
             payload = out  # 前段の出力を次段の入力へ
         yield "\n＝ 最終成果物は上記の最終ステップ出力です ＝\n"

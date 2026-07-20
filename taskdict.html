@@ -81,6 +81,7 @@
   .flowposter .ftitle{font-weight:800;font-size:14px;line-height:1.4;margin-bottom:6px;color:var(--ink)}
   .flowposter .fmeta{font-size:12px;color:var(--muted);line-height:1.6}
   .flowhint{font-size:12px;color:var(--faint);margin:-6px 0 14px;display:flex;align-items:center;gap:6px}
+  .flowposter .fquick{margin-top:auto;padding-top:10px;width:100%;font-size:12.5px;padding-left:10px;padding-right:10px}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow);transition:transform .16s,box-shadow .16s,border-color .16s;text-align:left;width:100%;padding:0;display:flex;flex-direction:column}
   .card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg);border-color:var(--line-strong)}
   .thumb{aspect-ratio:16/9;position:relative;display:grid;place-items:center;color:#fff}
@@ -274,6 +275,8 @@
   .pgroup{margin-bottom:22px;max-width:720px}
   .pgroup .pl{font-size:13px;font-weight:800;margin-bottom:10px;display:flex;align-items:center;gap:8px}
   .pchips{display:flex;gap:8px;flex-wrap:wrap}
+  .pbiz{width:100%;min-height:88px;border:1px solid var(--line-strong);border-radius:10px;padding:12px;font-size:13.5px;font-family:inherit;color:var(--ink);resize:vertical}
+  .pbiz:focus{outline:2px solid var(--accent-wash);border-color:var(--accent)}
   /* 業種キャラクター：かわいいモンスター（丸い体・目・角）というジャンル表現のみ借りたオリジナル生成。特定作品のキャラは模倣しない。 */
   .charcards{display:flex;gap:10px;flex-wrap:wrap}
   .charcard{display:flex;align-items:center;gap:10px;padding:9px 14px 9px 9px;border:1.5px solid var(--line);border-radius:16px;background:#fff;cursor:pointer;transition:.15s;text-align:left;max-width:236px}
@@ -809,7 +812,8 @@ const setUsage=n=>{localStorage.setItem(USAGE_KEY,String(n));updatePlanChip();};
 const PROFILE_KEY="task-profile-v1";
 const getProfile=()=>{try{return JSON.parse(localStorage.getItem(PROFILE_KEY))||{industry:null,role:null,tags:[]};}catch(e){return{industry:null,role:null,tags:[]};}};
 const setProfile=p=>localStorage.setItem(PROFILE_KEY,JSON.stringify(p));
-const hasProfile=()=>{const p=getProfile();return!!(p.industry||p.role||(p.tags&&p.tags.length));};
+const hasProfile=()=>{const p=getProfile();return!!(p.industry||p.role||(p.tags&&p.tags.length)||(p.bizDesc&&p.bizDesc.trim()));};
+const bizContext=()=>(getProfile().bizDesc||"").trim();
 /* 職種→おすすめエージェント（使えるもの優先）＋関心タグ一致を加味 */
 function recommended(){
   const p=getProfile();let list=[];
@@ -1200,13 +1204,42 @@ function renderFlows(){
   v.appendChild(el("div","flowhint","👉 カードを横にスライドして選べます"));
   const carousel=el("div","flowcarousel");
   WORKFLOWS.forEach(w=>{
-    const card=el("button","flowposter");
+    const card=el("div","flowposter");
     card.innerHTML=`<div class="fthumb" style="background:${w.grad}"><span class="fbadge">🔗 ${w.steps.length}体連携</span><span class="fglyph">🔗</span></div>
-      <div class="fbody"><div class="ftitle">${w.name}</div><div class="fmeta">${w.desc}</div></div>`;
+      <div class="fbody"><div class="ftitle">${w.name}</div><div class="fmeta">${w.desc}</div>
+      <button class="btn use fquick">▶ このまま使う</button></div>`;
     card.onclick=()=>{state.route="flow";state.flowId=w.id;renderAll();window.scrollTo(0,0);};
+    const qb=card.querySelector(".fquick");
+    qb.onclick=(e)=>{e.stopPropagation();openWorkflowRunModal(w);};
     carousel.appendChild(card);
   });
   v.appendChild(carousel);
+}
+/* ワークフロー一覧のカードから、詳細ページに行かず直接実行する（会議決定：この中でエージェントを使えるように） */
+function openWorkflowRunModal(w){
+  if(!isSubscriber()){openModal("🔒 ワークフロー実行は契約者限定です","連携ワークフローの実行は有料プラン（標準・プレミアム）でご利用いただけます。",`<button class="btn get" id="toPlansWfQ">プランを見てアップグレード</button>`);const b=$("#toPlansWfQ");if(b)b.onclick=()=>{$("#mscrim").classList.remove("on");state.route="plans";renderAll();window.scrollTo(0,0);};return;}
+  const conn=apiConnected();
+  openModal(`🔗 ${w.name} を実行`,conn?"本番APIに接続して、各ステップを直列連携で実行します。":"未接続のためサンプル出力を表示します（設定でAPIを繋ぐと本物が動きます）。",
+    `<div class="reqfield"><label>最初の入力（${w.steps[0].in}）</label><textarea id="qwfIn" placeholder="ここに入力"></textarea></div>
+     <button class="btn get" id="qwfGo">${conn?"▶ ワークフローを実行":"▶ サンプルで実行"}</button>
+     <div class="output" id="qwfOut" style="margin-top:14px;display:none"></div>
+     ${outputActions()}`);
+  $("#qwfGo").onclick=async()=>{
+    if(getUsage()>=limitFor(getPlan())){openUpsell();return;}
+    setUsage(getUsage()+1);
+    const input=($("#qwfIn").value||"").trim();const out=$("#qwfOut");out.style.display="block";
+    let text;
+    if(conn){text=await callAgentApi(`/v1/workflows/${w.id}/run`,{input,context:bizContext()},out);}
+    else{
+      let cur=input||"（未入力）";const lines=[`【ワークフロー: ${w.name}】（サンプル実行）\n`];
+      w.steps.forEach((s,i)=>{
+        if(s.build){lines.push(`▼ STEP ${i+1} ${s.agent}（未整備・スキップ）`);return;}
+        const o=`${s.out}（サンプル）`;lines.push(`▼ STEP ${i+1} ${s.agent}\n  入力: ${cur}\n  出力: ${o}`);cur=o;
+      });
+      lines.push(`\n＝ 最終成果物 ＝\n${cur}`);text=lines.join("\n");out.textContent=text;
+    }
+    if(text)wireOutputActions(()=>out.textContent,`${w.name}.txt`);
+  };
 }
 function renderFlow(){
   const w=WORKFLOWS.find(x=>x.id===state.flowId);if(!w){state.route="flows";return renderFlows();}
@@ -1243,7 +1276,7 @@ function renderFlow(){
     setUsage(getUsage()+1);
     const input=($("#wfIn").value||"").trim();const out=$("#wfOut");out.style.display="block";
     let text;
-    if(conn){text=await callAgentApi(`/v1/workflows/${w.id}/run`,{input},out);}
+    if(conn){text=await callAgentApi(`/v1/workflows/${w.id}/run`,{input,context:bizContext()},out);}
     else{
       let cur=input||"（未入力）";const lines=[`【ワークフロー: ${w.name}】（サンプル実行）\n`];
       w.steps.forEach((s,i)=>{
@@ -1440,7 +1473,7 @@ function openRun(t){
   $("#runGo").onclick=async()=>{
     const input=($("#runIn").value||"").trim();const out=$("#outText");out.style.display="block";
     let text;
-    if(conn){text=await callAgentApi(`/v1/agents/${t.id}/run`,{input},out);}
+    if(conn){text=await callAgentApi(`/v1/agents/${t.id}/run`,{input,context:bizContext()},out);}
     else{text=`【${t.name}】出力サンプル（プロトタイプ）\n\n― ${io.out} ―\n\n入力: ${input||"（未入力）"}\n\n※ 未接続のためサンプルです。設定でAPIを繋ぐと実際の成果物が生成されます。`;out.textContent=text;}
     if(text)wireOutputActions(()=>out.textContent,`${t.name}.txt`);
   };
@@ -1537,13 +1570,19 @@ function renderProfile(){
   const c2=el("div","pchips");ROLES.forEach(r=>{const b=el("button","tagchip"+(p.role===r.key?" on":""),r.label);b.onclick=()=>{p.role=(p.role===r.key?null:r.key);setProfile(p);renderProfile();};c2.appendChild(b);});g2.appendChild(c2);v.appendChild(g2);
   const g3=el("div","pgroup");g3.appendChild(el("div","pl","🏷️ 関心のある“やること”（複数可）"));
   const c3=el("div","pchips");TAG_LIST.forEach(tg=>{const on=(p.tags||[]).includes(tg);const b=el("button","tagchip"+(on?" on":""),tg);b.onclick=()=>{p.tags=p.tags||[];p.tags=on?p.tags.filter(x=>x!==tg):p.tags.concat(tg);setProfile(p);renderProfile();};c3.appendChild(b);});g3.appendChild(c3);v.appendChild(g3);
+  const g4=el("div","pgroup");
+  g4.appendChild(el("div","pl","🏢 事業内容・サービス（自由記述・任意）"));
+  g4.appendChild(el("p","libsub",'エージェントを実行するとき、この内容を踏まえて成果物を作ります（例: 「横浜市の注文住宅・リフォーム会社。戸建てのリノベーションが中心。」）。'));
+  const bizBox=el("textarea");bizBox.className="pbiz";bizBox.placeholder="あなたの会社・事業について、わかる範囲で書いてください";bizBox.value=p.bizDesc||"";
+  bizBox.onchange=()=>{const pp=getProfile();pp.bizDesc=bizBox.value.trim();setProfile(pp);toast("事業内容を保存しました","🏢");};
+  g4.appendChild(bizBox);v.appendChild(g4);
   const rl=roleOf(p.role);
-  v.appendChild(el("p","libsub",hasProfile()?`設定済み: ${p.industry||"—"} ／ ${rl?rl.label:"—"} ／ 関心タグ ${(p.tags||[]).length}件`:"まだ設定されていません。"));
+  v.appendChild(el("p","libsub",hasProfile()?`設定済み: ${p.industry||"—"} ／ ${rl?rl.label:"—"} ／ 関心タグ ${(p.tags||[]).length}件 ／ 事業内容 ${p.bizDesc?"入力済み":"未入力"}`:"まだ設定されていません。"));
   const act=el("div");act.style.cssText="display:flex;gap:10px;flex-wrap:wrap;align-items:center";
   const go=el("button","planbtn up","🎯 おすすめエージェントを見る");go.style.cssText="width:auto;padding:11px 18px;margin-top:0";
   go.onclick=()=>{state.route="library";state.cat="all";state.q="";state.tag=null;renderAll();window.scrollTo(0,0);};
   act.appendChild(go);
-  const clr=el("button","tagclear","設定をクリア");clr.style.marginLeft="0";clr.onclick=()=>{setProfile({industry:null,role:null,tags:[]});renderProfile();toast("設定をクリアしました");};
+  const clr=el("button","tagclear","設定をクリア");clr.style.marginLeft="0";clr.onclick=()=>{setProfile({industry:null,role:null,tags:[],bizDesc:""});renderProfile();toast("設定をクリアしました");};
   act.appendChild(clr);v.appendChild(act);
 }
 
