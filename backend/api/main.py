@@ -173,20 +173,3 @@ def latest_news():
 @app.get("/healthz")
 def healthz():
     return {"ok": True, "agents": len(AGENTS), "workflows": len(WORKFLOWS)}
-
-
-@app.get("/v1/_diag/managed-agents")
-def diag_managed_agents(x_api_key: str | None = Header(default=None)):
-    """一時的な疎通確認用。この組織でManaged Agents（ベータ）が使えるかだけを確認する
-    （エージェントのメタデータ作成のみ・環境やセッションは作らないため実行課金は発生しない）。
-    確認が済んだら削除してよい。"""
-    _auth(x_api_key)
-    try:
-        agent = client.beta.agents.create(
-            name="TASK AGENTS 疎通確認用（削除可）",
-            model="claude-opus-4-8",
-            system="診断用の一時エージェントです。",
-        )
-        return {"ok": True, "agent_id": agent.id, "version": agent.version}
-    except Exception as e:
-        return {"ok": False, "error_type": type(e).__name__, "error": str(e)}
