@@ -1982,6 +1982,32 @@ function libConvCard(cv){
    やり取りと生成物はマイライブラリの「会話」に自動で溜まっていく。
    ===================================================================== */
 const SUPER_EXAMPLE="問い合わせメールの内容を自動分類してSlackへ通知するツールを作って。分類は「見積」「クレーム」「その他」の3種類。";
+/* 事例から始める: 業種×業務のよくあるパターンを選ぶだけで、そのままエージェントが作り始める（Genspark型の入口） */
+const SUPER_CASES=[
+  {ind:"その他",role:"営業",title:"商談音声を自動でCRMに転記する仕組みを作る",
+   prompt:"営業担当者が話した商談内容の文字起こしテキストから、顧客名・商談の要点・次のアクション・確度（ステージ）を自動抽出し、HubSpotのような外部CRMへ自動転記してステージを更新する仕組みを設計・プロトタイプ作成してください。まだCRMとの実接続がない前提でよいので、サンプルの文字起こしを1つ想定し、抽出結果とCRM更新用のデータ（JSON）をモックで出力するところまで作ってください。営業担当者が入力せずに済む（話すだけで完結する）ことが目的です。"},
+  {ind:"IT・ソフトウェア",role:"情シス・運用",title:"問い合わせメールを自動分類して通知するツールを作る",
+   prompt:"問い合わせメールの内容を自動分類して、Slackに通知するツールを作ってください。分類は「見積」「クレーム」「その他」の3種類です。"},
+  {ind:"建設・不動産",role:"マーケティング",title:"新築注文住宅のチラシ・LP文章を作る",
+   prompt:"工務店の新築注文住宅のチラシとランディングページの文章を作ってください。ターゲットは30〜40代のファミリー層、強みは「土地探しから相談できる」「完成保証」です。"},
+  {ind:"製造",role:"PM・進行管理",title:"工程の進捗を見える化するスプレッドシートを作る",
+   prompt:"複数の受注案件の工程（受注→設計→製造→検査→出荷）を管理し、遅れている工程が一目でわかる進捗管理表をExcel形式で作ってください。"},
+  {ind:"小売・EC",role:"マーケティング",title:"商品ページのキャッチコピーをまとめて作る",
+   prompt:"ECサイトの商品ページ用に、季節のおすすめ商品5点分のキャッチコピーと紹介文を、それぞれ3パターンずつ作ってください。"},
+  {ind:"医療・介護",role:"経理・総務・人事",title:"シフト希望を集計して自動でシフト表を作る",
+   prompt:"スタッフ5人分の勤務希望（自由記述を想定）から、公平になるように1週間分のシフト表を自動作成するツールを作ってください。"},
+  {ind:"士業・コンサル",role:"経理・総務・人事",title:"契約書の一次チェックリストを作る",
+   prompt:"業務委託契約書をレビューする際に見落としがちな条項（損害賠償・秘密保持・解除条件など）を確認できるチェックリストを作ってください。"},
+  {ind:"教育",role:"マーケティング",title:"体験授業の集客LPと申込フォームを作る",
+   prompt:"学習塾の無料体験授業に申し込んでもらうためのランディングページ文章と、必要な入力項目を洗い出した申込フォームの設計を作ってください。"},
+  {ind:"飲食・サービス",role:"営業事務",title:"予約状況を集計する売上管理シートを作る",
+   prompt:"日々の予約人数と客単価から、月間売上の見込みを自動計算するスプレッドシートを作ってください。"},
+];
+const superCasesSorted=()=>{
+  const myInd=getProfile().industry;
+  if(!myInd)return SUPER_CASES;
+  return [...SUPER_CASES].sort((a,b)=>(a.ind===myInd?0:1)-(b.ind===myInd?0:1));
+};
 let superState={sessionId:null,messages:[],libId:null,running:false,files:[]};
 /* ストリームの先頭行 [[SESSION_ID:...]] を都度剥がしながら表示テキストを組み立てる */
 async function callSuperAgentApi(path,body,onChunk){
@@ -2042,26 +2068,36 @@ function renderSuper(){
     wrap.appendChild(el("div","empty",`<div class="big">🔌</div>この機能の利用には本番API接続が必要です。<br><span style="font-size:12px">画面右上の設定からAPIのURLを接続してください。</span>`));
     v.appendChild(wrap);return;
   }
-  if(superState.messages.length){
-    const nb=el("button","btn use","🆕 新しく作る");
-    nb.style.cssText="width:auto;padding:7px 14px;margin:0 0 12px";
-    nb.onclick=()=>{superState={sessionId:null,messages:[],libId:null,running:false,files:[]};renderSuper();};
-    wrap.appendChild(nb);
-  }
-  wrap.innerHTML+=`<div class="chatthread" id="superThread"></div>
+  const hasConv=superState.messages.length>0;
+  const cases=superCasesSorted();
+  const caseGallery=hasConv?"":`
+    <p class="libsub"><b>💡 事例から始める</b>（クリックするとそのままエージェントが作り始めます）</p>
+    <div class="charcards" id="superCases">${cases.map((c,i)=>{
+      const ic=INDUSTRY_CHAR[c.ind]||INDUSTRY_CHAR["その他"];
+      return `<button type="button" class="charcard" data-i="${i}">${charIcon(ic,false)}<span><span class="charname">${c.title}</span><span class="charline">${c.ind}×${c.role}</span></span></button>`;
+    }).join("")}</div>
+    <p class="libsub">または、自由に入力する↓</p>`;
+  wrap.innerHTML=`${hasConv?`<button type="button" class="btn use" id="superReset" style="width:auto;padding:7px 14px;margin:0 0 12px">🆕 新しく作る</button>`:""}
+    ${caseGallery}
+    <div class="chatthread" id="superThread"></div>
     <div id="superFiles"></div>
     <div class="reqfield" style="margin-bottom:0">
-      <label>${superState.messages.length?"続きを指示する":"作りたいものを入力"}</label>
-      ${!superState.messages.length?`<div class="examplebox"><span class="exlabel">💡 例</span><p>${SUPER_EXAMPLE}</p><button type="button" class="btn get" id="superExUse">この例を使う</button></div>`:""}
+      <label>${hasConv?"続きを指示する":"または、作りたいものを直接入力"}</label>
+      ${!hasConv?`<div class="examplebox"><span class="exlabel">💡 例</span><p>${SUPER_EXAMPLE}</p><button type="button" class="btn get" id="superExUse">この例を使う</button></div>`:""}
       <div class="chatrow"><textarea id="superIn" placeholder="例: 見積書を自動作成するツールを作って（Enterで送信／Shift+Enterで改行）"></textarea>
-      <button class="btn get" id="superSend">${superState.messages.length?"送信":"作成開始"}</button></div>
+      <button class="btn get" id="superSend">${hasConv?"送信":"作成開始"}</button></div>
     </div>`;
   v.appendChild(wrap);
   const thread=$("#superThread");
   const renderThread=()=>{thread.innerHTML=superState.messages.map(m=>chatBubbleHTML(m.role,m.content)).join("");thread.scrollTop=thread.scrollHeight;};
   renderThread();
   refreshSuperFiles();
+  const rb=$("#superReset");if(rb)rb.onclick=()=>{superState={sessionId:null,messages:[],libId:null,running:false,files:[]};renderSuper();};
   const exUse=$("#superExUse");if(exUse)exUse.onclick=()=>{const ci=$("#superIn");ci.value=SUPER_EXAMPLE;ci.focus();ci.setSelectionRange(ci.value.length,ci.value.length);};
+  const caseBox=$("#superCases");
+  if(caseBox)caseBox.querySelectorAll("button").forEach(b=>{
+    b.onclick=()=>{const c=cases[+b.dataset.i];$("#superIn").value=c.prompt;send();};
+  });
   const send=async()=>{
     const inp=$("#superIn");const text=(inp.value||"").trim();if(!text||superState.running)return;
     inp.value="";inp.disabled=true;const btn=$("#superSend");if(btn)btn.disabled=true;
