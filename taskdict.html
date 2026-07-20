@@ -1625,5 +1625,27 @@ function renderAll(){
   else renderLibrary();
 }
 $(".icobtn[title='お知らせ']").onclick=()=>{state.route="news";renderAll();window.scrollTo(0,0);};
+/* 初回訪問オンボーディング：業種を1タップ選ぶだけでパーソナライズが完了する（会議決定：診断フローを最初に挿入） */
+const ONBOARD_KEY="task-onboarded-v1";
+function maybeShowOnboarding(){
+  if(hasProfile()||localStorage.getItem(ONBOARD_KEY))return;
+  const cards=INDUSTRIES.map(ind=>{
+    const ic=INDUSTRY_CHAR[ind];
+    return `<button class="charcard onboard-pick" data-ind="${ind}">${monsterHTML(ic,false)}<span><span class="charname">${ind}</span><span class="charline">${ic.line}</span></span></button>`;
+  }).join("");
+  openModal("👋 はじめまして","まずはあなたの業種を選んでください。おすすめのエージェントをすぐにご案内します（あとから設定で変更できます）。",
+    `<div class="charcards">${cards}</div><button class="btn use" id="onboardSkip" style="margin-top:14px">あとで設定する</button>`);
+  document.querySelectorAll(".onboard-pick").forEach(b=>{
+    b.onclick=()=>{
+      const p=getProfile();p.industry=b.dataset.ind;setProfile(p);
+      localStorage.setItem(ONBOARD_KEY,"1");
+      $("#mscrim").classList.remove("on");
+      toast(`${b.dataset.ind}に合わせておすすめを表示します`,"🎯");
+      renderAll();
+    };
+  });
+  const skip=$("#onboardSkip");if(skip)skip.onclick=()=>{localStorage.setItem(ONBOARD_KEY,"1");$("#mscrim").classList.remove("on");};
+}
 renderAll();
+maybeShowOnboarding();
 </script>
