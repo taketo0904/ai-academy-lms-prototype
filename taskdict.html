@@ -845,6 +845,55 @@ function downloadCSV(filename,text){
     toast("Excel用に保存しました","📊");
   }catch(e){toast("この環境ではDL不可（公開URLでは可能）","⬇️");}
 }
+/* 成果物をWordで開ける文書に変換。見出し(#)・太字(**)・箇条書き(-/1.)・表(|)を簡易変換する */
+function mdToHtml(text){
+  const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const inline=s=>esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/\*(.+?)\*/g,"<i>$1</i>");
+  const lines=text.replace(/\r\n?/g,"\n").split("\n");
+  let html="",i=0,listType=null;
+  const closeList=()=>{if(listType){html+=listType==="ul"?"</ul>":"</ol>";listType=null;}};
+  while(i<lines.length){
+    const line=lines[i];
+    const h=line.match(/^(#{1,3})\s+(.*)$/);
+    if(h){closeList();const lv=h[1].length+1;html+=`<h${lv}>${inline(h[2])}</h${lv}>`;i++;continue;}
+    if(/^\s*\|.*\|\s*$/.test(line)){
+      closeList();
+      const rows=[];
+      while(i<lines.length&&/^\s*\|.*\|\s*$/.test(lines[i])){
+        if(!/^\s*\|[\s:\-|]+\|\s*$/.test(lines[i]))rows.push(lines[i].trim().replace(/^\|/,"").replace(/\|$/,"").split("|").map(c=>c.trim()));
+        i++;
+      }
+      if(rows.length){
+        html+='<table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse">';
+        rows.forEach((r,ri)=>{const tag=ri===0?"th":"td";html+="<tr>"+r.map(c=>`<${tag}>${inline(c)}</${tag}>`).join("")+"</tr>";});
+        html+="</table>";
+      }
+      continue;
+    }
+    const ul=line.match(/^\s*[-*]\s+(.*)$/);
+    if(ul){if(listType!=="ul"){closeList();html+="<ul>";listType="ul";}html+=`<li>${inline(ul[1])}</li>`;i++;continue;}
+    const ol=line.match(/^\s*\d+\.\s+(.*)$/);
+    if(ol){if(listType!=="ol"){closeList();html+="<ol>";listType="ol";}html+=`<li>${inline(ol[1])}</li>`;i++;continue;}
+    if(line.trim()===""){closeList();i++;continue;}
+    closeList();html+=`<p>${inline(line)}</p>`;i++;
+  }
+  closeList();
+  return html;
+}
+function downloadWord(filename,title,text){
+  try{
+    const body=mdToHtml(text);
+    const doc=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8"><title>${title.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</title>
+<style>body{font-family:'Yu Gothic','游ゴシック',sans-serif;font-size:11pt;line-height:1.7}h1{font-size:18pt}h2{font-size:15pt}h3{font-size:13pt}table{border-collapse:collapse;margin:8pt 0}td,th{border:1px solid #888;padding:4pt 8pt}</style>
+</head><body>${body}</body></html>`;
+    const blob=new Blob([String.fromCharCode(0xFEFF)+doc],{type:"application/msword"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    toast("Wordで保存しました","📝");
+  }catch(e){toast("この環境ではDL不可（公開URLでは可能）","⬇️");}
+}
 /* エージェントAPI実行（ストリーミング対応・失敗時はメッセージ表示） */
 async function callAgentApi(path,body,resultEl){
   const base=getApiBase().replace(/\/$/,"");const key=getApiKey();
@@ -1275,7 +1324,7 @@ function renderFlow(){
   runbox.innerHTML=`<div class="reqfield"><label>最初の入力（${w.steps[0].in}）</label><textarea id="wfIn" placeholder="ここに入力"></textarea></div>
     <button class="btn get" id="wfGo" style="width:auto;padding:11px 20px">${conn?"▶ ワークフローを実行":"▶ サンプルで実行"}</button>
     <div class="output" id="wfOut" style="margin-top:14px;display:none"></div>
-    <div id="wfActs" style="display:none;gap:10px;margin-top:12px;flex-wrap:wrap"><button class="btn get" id="wfCopy" style="flex:1">コピー</button><button class="btn use" id="wfDl" style="flex:1;margin-top:0">📄 テキストで保存</button><button class="btn use" id="wfDlXls" style="flex:1;margin-top:0">📊 Excelで保存</button></div>
+    <div id="wfActs" style="display:none;gap:10px;margin-top:12px;flex-wrap:wrap"><button class="btn get" id="wfCopy" style="flex:1">コピー</button><button class="btn use" id="wfDl" style="flex:1;margin-top:0">📄 テキストで保存</button><button class="btn use" id="wfDlXls" style="flex:1;margin-top:0">📊 Excelで保存</button><button class="btn use" id="wfDlDoc" style="flex:1;margin-top:0">📝 Wordで保存</button></div>
     <div id="wfSaved" style="display:none;font-size:11.5px;color:var(--muted);margin-top:8px">📚 マイライブラリに自動保存しました</div>`;
   wrap.appendChild(runbox);
   v.appendChild(wrap);
@@ -1294,7 +1343,7 @@ function renderFlow(){
       });
       lines.push(`\n＝ 最終成果物 ＝\n${cur}`);text=lines.join("\n");out.textContent=text;
     }
-    if(text){const a=$("#wfActs");if(a)a.style.display="flex";const cp=$("#wfCopy");if(cp)cp.onclick=async()=>{try{await navigator.clipboard.writeText(out.textContent);toast("コピーしました");}catch(e){toast("コピーは公開URLで可能","📋");}};const dl=$("#wfDl");if(dl)dl.onclick=()=>downloadText(`${w.name}.txt`,out.textContent);const dx=$("#wfDlXls");if(dx)dx.onclick=()=>downloadCSV(`${w.name}.csv`,out.textContent);
+    if(text){const a=$("#wfActs");if(a)a.style.display="flex";const cp=$("#wfCopy");if(cp)cp.onclick=async()=>{try{await navigator.clipboard.writeText(out.textContent);toast("コピーしました");}catch(e){toast("コピーは公開URLで可能","📋");}};const dl=$("#wfDl");if(dl)dl.onclick=()=>downloadText(`${w.name}.txt`,out.textContent);const dx=$("#wfDlXls");if(dx)dx.onclick=()=>downloadCSV(`${w.name}.csv`,out.textContent);const dw=$("#wfDlDoc");if(dw)dw.onclick=()=>downloadWord(`${w.name}.doc`,w.name,out.textContent);
       if(conn){addLibraryItem("output",w.name,out.textContent,{name:w.name});const sv=$("#wfSaved");if(sv)sv.style.display="block";}}
   };
 }
@@ -1467,6 +1516,7 @@ function outputActions(getText,filename){
        <button class="btn get" id="copyOut" style="flex:1">コピー</button>
        <button class="btn use" id="dlOut" style="flex:1;margin-top:0">📄 テキストで保存</button>
        <button class="btn use" id="dlXls" style="flex:1;margin-top:0">📊 Excelで保存</button>
+       <button class="btn use" id="dlDoc" style="flex:1;margin-top:0">📝 Wordで保存</button>
      </div>
      <div id="runSaved" style="display:none;font-size:11.5px;color:var(--muted);margin-top:8px">📚 マイライブラリに自動保存しました</div>`;
 }
@@ -1475,6 +1525,8 @@ function wireOutputActions(getText,filename,libTitle){
   const cp=$("#copyOut");if(cp)cp.onclick=async()=>{try{await navigator.clipboard.writeText(getText());toast("コピーしました");}catch(e){toast("コピーは公開URLで可能です","📋");}};
   const dl=$("#dlOut");if(dl)dl.onclick=()=>downloadText(filename,getText());
   const dx=$("#dlXls");if(dx)dx.onclick=()=>downloadCSV(filename.replace(/\.txt$/,"")+".csv",getText());
+  const base=filename.replace(/\.txt$/,"");
+  const dw=$("#dlDoc");if(dw)dw.onclick=()=>downloadWord(base+".doc",base,getText());
   if(libTitle){
     addLibraryItem("output",libTitle,getText(),{name:libTitle});
     const sv=$("#runSaved");if(sv)sv.style.display="block";
@@ -1499,6 +1551,7 @@ function openRun(t,existingConv){
        <button class="btn get" id="chatCopy" style="flex:1">コピー</button>
        <button class="btn use" id="chatTxt" style="flex:1;margin-top:0">📄 テキスト</button>
        <button class="btn use" id="chatXls" style="flex:1;margin-top:0">📊 Excel</button>
+       <button class="btn use" id="chatDoc" style="flex:1;margin-top:0">📝 Word</button>
      </div>
      <div id="chatSaved" style="display:${messages.length?"block":"none"};font-size:11.5px;color:var(--muted);margin-top:8px">📚 マイライブラリに自動保存しています</div>`);
   const thread=$("#chatThread");
@@ -1510,6 +1563,7 @@ function openRun(t,existingConv){
     const cp=$("#chatCopy");if(cp)cp.onclick=async()=>{try{await navigator.clipboard.writeText(transcript());toast("コピーしました");}catch(e){toast("コピーは公開URLで可能です","📋");}};
     const dl=$("#chatTxt");if(dl)dl.onclick=()=>downloadText(`${t.agent.name}_会話.txt`,transcript());
     const dx=$("#chatXls");if(dx)dx.onclick=()=>downloadCSV(`${t.agent.name}_会話.csv`,transcript());
+    const dw=$("#chatDoc");if(dw)dw.onclick=()=>downloadWord(`${t.agent.name}_会話.doc`,`${t.agent.name}の会話`,transcript());
   };
   wireActs();
   const send=async()=>{
@@ -1684,7 +1738,15 @@ function libNoteCard(n){
   const c=el("div","libcard");
   c.innerHTML=`<details><summary><span class="lct">📝 ${n.title}</span><span class="lcd">${fmtDate(n.createdAt)}</span></summary>
     <div class="output lcbody">${n.body.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</div>
-    <div class="lcacts"><button class="btn use lcdel" style="flex:1;margin-top:0">🗑 削除</button></div></details>`;
+    <div class="lcacts">
+      <button class="btn get lccopy" style="flex:1">コピー</button>
+      <button class="btn use lctxt" style="flex:1;margin-top:0">📄 テキスト</button>
+      <button class="btn use lcdoc" style="flex:1;margin-top:0">📝 Word</button>
+      <button class="btn use lcdel" style="flex:1;margin-top:0">🗑 削除</button>
+    </div></details>`;
+  c.querySelector(".lccopy").onclick=async e=>{e.preventDefault();try{await navigator.clipboard.writeText(n.body);toast("コピーしました");}catch(err){toast("コピーは公開URLで可能です","📋");}};
+  c.querySelector(".lctxt").onclick=e=>{e.preventDefault();downloadText(`${n.title}.txt`,n.body);};
+  c.querySelector(".lcdoc").onclick=e=>{e.preventDefault();downloadWord(`${n.title}.doc`,n.title,n.body);};
   c.querySelector(".lcdel").onclick=e=>{e.preventDefault();e.stopPropagation();if(confirm("このメモを削除しますか？")){deleteLibraryItem(n.id);renderMyLibrary();}};
   return c;
 }
@@ -1698,11 +1760,13 @@ function libOutputCard(o){
       <button class="btn get lccopy" style="flex:1">コピー</button>
       <button class="btn use lctxt" style="flex:1;margin-top:0">📄 テキスト</button>
       <button class="btn use lcxls" style="flex:1;margin-top:0">📊 Excel</button>
+      <button class="btn use lcdoc" style="flex:1;margin-top:0">📝 Word</button>
       <button class="btn use lcdel" style="flex:1;margin-top:0">🗑 削除</button>
     </div></details>`;
   c.querySelector(".lccopy").onclick=async e=>{e.preventDefault();try{await navigator.clipboard.writeText(o.body);toast("コピーしました");}catch(err){toast("コピーは公開URLで可能です","📋");}};
   c.querySelector(".lctxt").onclick=e=>{e.preventDefault();downloadText(`${o.title}.txt`,o.body);};
   c.querySelector(".lcxls").onclick=e=>{e.preventDefault();downloadCSV(`${o.title}.csv`,o.body);};
+  c.querySelector(".lcdoc").onclick=e=>{e.preventDefault();downloadWord(`${o.title}.doc`,o.title,o.body);};
   c.querySelector(".lcdel").onclick=e=>{e.preventDefault();if(confirm("この成果物を削除しますか？")){deleteLibraryItem(o.id);renderMyLibrary();}};
   return c;
 }
@@ -1710,14 +1774,19 @@ function libConvCard(cv){
   const c=el("div","libcard");
   const last=cv.messages[cv.messages.length-1];
   const preview=last?last.content.slice(0,90)+(last.content.length>90?"…":""):"";
+  const transcript=cv.messages.map(m=>`${m.role==="user"?"【あなた】":`【${cv.title}】`}\n${m.content}`).join("\n\n");
   c.innerHTML=`<details><summary><span class="lct">💬 ${cv.title}</span><span class="lcd">${fmtDate(cv.updatedAt||cv.createdAt)}</span></summary>
     <div style="font-size:11px;color:var(--faint);margin:6px 0">${cv.messages.length}件のやり取り</div>
     <div class="output lcbody">${preview.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</div>
     <div class="lcacts">
       <button class="btn get lccont" style="flex:1">💬 続きを話す</button>
+      <button class="btn use lctxt" style="flex:1;margin-top:0">📄 テキスト</button>
+      <button class="btn use lcdoc" style="flex:1;margin-top:0">📝 Word</button>
       <button class="btn use lcdel" style="flex:1;margin-top:0">🗑 削除</button>
     </div></details>`;
   c.querySelector(".lccont").onclick=e=>{e.preventDefault();continueConversation(cv);};
+  c.querySelector(".lctxt").onclick=e=>{e.preventDefault();downloadText(`${cv.title}_会話.txt`,transcript);};
+  c.querySelector(".lcdoc").onclick=e=>{e.preventDefault();downloadWord(`${cv.title}_会話.doc`,`${cv.title}の会話`,transcript);};
   c.querySelector(".lcdel").onclick=e=>{e.preventDefault();if(confirm("この会話を削除しますか？")){deleteLibraryItem(cv.id);renderMyLibrary();}};
   return c;
 }
