@@ -751,11 +751,28 @@ const getProfile=()=>{try{return JSON.parse(localStorage.getItem(PROFILE_KEY))||
 const setProfile=p=>localStorage.setItem(PROFILE_KEY,JSON.stringify(p));
 const hasProfile=()=>{const p=getProfile();return!!(p.industry||p.role||(p.tags&&p.tags.length)||(p.bizDesc&&p.bizDesc.trim()));};
 const bizContext=()=>(getProfile().bizDesc||"").trim();
-/* 職種→おすすめエージェント（使えるもの優先）＋関心タグ一致を加味 */
+/* 業種→優先カテゴリ（アイデアが無い人でも、選んだ業種だけで関連エージェントが動き出すように） */
+const INDUSTRY_CATS={
+  "IT・ソフトウェア":["US03","DV15","CM06"],
+  "建設・不動産":["FS10","SP01","SP02"],
+  "製造":["FS10","US03","FN09"],
+  "小売・EC":["CM01","SP01","CS07"],
+  "医療・介護":["CS07","SP02","LG08"],
+  "士業・コンサル":["LG08","FN09","SP01"],
+  "教育":["CS07","CM01","SP02"],
+  "飲食・サービス":["CS07","CM01","FS10"],
+  "その他":["SP01","SP02"],
+};
+/* 業種・職種→おすすめエージェント（使えるもの優先）＋関心タグ一致を加味 */
 function recommended(){
   const p=getProfile();let list=[];
   const r=roleOf(p.role);
-  if(r&&r.cat!=="all")list=ALLTASKS().filter(t=>t.cat===r.cat&&t.agent);
+  if(r&&r.cat!=="all")list=list.concat(ALLTASKS().filter(t=>t.cat===r.cat&&t.agent));
+  if(p.industry&&INDUSTRY_CATS[p.industry]){
+    INDUSTRY_CATS[p.industry].forEach(cat=>{
+      list=list.concat(ALLTASKS().filter(t=>t.cat===cat&&t.agent&&t.status==="ready").slice(0,3));
+    });
+  }
   if(p.tags&&p.tags.length){const byTag=ALLTASKS().filter(t=>t.agent&&tagsOf(t.id).some(g=>p.tags.includes(g)));list=list.concat(byTag);}
   const seen=new Set();const uniq=[];list.forEach(t=>{if(!seen.has(t.id)){seen.add(t.id);uniq.push(t);}});
   return uniq.slice(0,6);
@@ -1048,9 +1065,9 @@ function renderLibrary(){
   if(state.cat==="all"&&!state.q&&!state.tag&&hasProfile()&&recommended().length){
     const p=getProfile();const rl=roleOf(p.role);
     const rb=el("div","newband");
-    rb.innerHTML=`<h4>🎯 あなたへのおすすめ</h4><p>${p.industry?p.industry+"・":""}${rl?rl.label:"あなた"}の業務に合わせたエージェントです。<a href="#" id="editprof" style="color:var(--accent-ink)">設定を変更</a></p>`;
+    rb.innerHTML=`<h4>🎯 ${p.industry?p.industry+"の":""}あなたへ・タップで動き出します</h4><p>${p.industry?p.industry+"・":""}${rl?rl.label:"あなた"}の業務に合わせたエージェントです。何をすればいいか迷ったら、まずここから。<a href="#" id="editprof" style="color:var(--accent-ink)">設定を変更</a></p>`;
     const chips=el("div","chips");
-    recommended().forEach(t=>{const c=el("button","chip2",`🤖 ${t.agent.name}`);c.onclick=()=>{state.route="detail";state.taskId=t.id;renderAll();window.scrollTo(0,0);};chips.appendChild(c);});
+    recommended().forEach(t=>{const c=el("button","chip2",`💬 ${t.agent.name}`);c.onclick=()=>runAgent(t);chips.appendChild(c);});
     rb.appendChild(chips);col.appendChild(rb);
     const ep=rb.querySelector("#editprof");if(ep)ep.onclick=e=>{e.preventDefault();state.route="profile";renderAll();window.scrollTo(0,0);};
   }
@@ -1596,8 +1613,8 @@ function renderFree(){
   v.appendChild(up);
   if(hasProfile()&&recommended().length){
     const rb=el("div","newband");rb.style.marginTop="22px";
-    rb.innerHTML=`<h4>🎯 あなたへのおすすめ</h4><p>設定に合わせたエージェントです。まずはお試しで実行してみましょう。</p>`;
-    const rc=el("div","chips");recommended().forEach(t=>{const c=el("button","chip2",`🤖 ${t.agent.name}`);c.onclick=()=>{state.route="detail";state.taskId=t.id;renderAll();window.scrollTo(0,0);};rc.appendChild(c);});
+    rb.innerHTML=`<h4>🎯 あなたへ・タップで動き出します</h4><p>設定に合わせたエージェントです。まずはお試しで話しかけてみましょう。</p>`;
+    const rc=el("div","chips");recommended().forEach(t=>{const c=el("button","chip2",`💬 ${t.agent.name}`);c.onclick=()=>runAgent(t);rc.appendChild(c);});
     rb.appendChild(rc);v.appendChild(rb);
   }
 }
