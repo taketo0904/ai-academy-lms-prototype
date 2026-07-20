@@ -293,6 +293,15 @@
   .reqfield input,.reqfield textarea{width:100%;border:1px solid var(--line-strong);border-radius:9px;padding:10px 12px;font-size:14px;font-family:inherit;color:var(--ink)}
   .reqfield textarea{min-height:60px;resize:vertical}
   .reqfield input:focus,.reqfield textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-wash)}
+  /* マイライブラリ: 個人のメモ・成果物アーカイブ */
+  .libcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:10px;box-shadow:var(--shadow)}
+  .libcard details{padding:13px 16px}
+  .libcard summary{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none}
+  .libcard summary::-webkit-details-marker{display:none}
+  .libcard .lct{font-weight:800;font-size:13.5px;color:var(--ink);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .libcard .lcd{font-size:11px;color:var(--faint);flex-shrink:0}
+  .libcard .lcbody{margin-top:12px}
+  .libcard .lcacts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
   .qitem{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:var(--shadow);max-width:760px}
   .qitem .qh{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:6px}
   .qitem .qname{font-size:15px;font-weight:800}
@@ -827,7 +836,23 @@ async function callAgentApi(path,body,resultEl){
   }catch(e){resultEl.textContent=`接続できませんでした（${e.message}）。API未デプロイ／CORS設定をご確認ください。`;return null;}
 }
 const catOf=code=>CATS.find(c=>c.code===code);
-let state={cat:"all",view:"grid",q:"",route:"library",taskId:null,level:"beg",lessonId:null,flowId:null,tag:null};
+let state={cat:"all",view:"grid",q:"",route:"library",taskId:null,level:"beg",lessonId:null,flowId:null,tag:null,libTab:"note"};
+/* マイライブラリ: 自分専用のメモ＋エージェント成果物の蓄積（ブラウザ内保存） */
+const LIB_KEY="task-mylibrary-v1";
+const getLibrary=()=>{try{return JSON.parse(localStorage.getItem(LIB_KEY)||"[]");}catch(e){return [];}};
+const setLibrary=arr=>localStorage.setItem(LIB_KEY,JSON.stringify(arr));
+function addLibraryItem(kind,title,body,meta){
+  const arr=getLibrary();
+  const item={id:"lib_"+Date.now()+"_"+Math.random().toString(36).slice(2,7),kind,title,body,createdAt:Date.now(),meta:meta||{}};
+  arr.unshift(item);setLibrary(arr);return item;
+}
+function deleteLibraryItem(id){setLibrary(getLibrary().filter(x=>x.id!==id));}
+const libNotesCount=()=>getLibrary().filter(x=>x.kind==="note").length;
+const libOutputsCount=()=>getLibrary().filter(x=>x.kind==="output").length;
+function fmtDate(ts){
+  const d=new Date(ts);
+  return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+}
 let liveNews=NEWS.map(n=>({...n})),newsTimer=null,extraIdx=0,justPushed=null;
 function ago(min){if(min<1)return"たった今";if(min<60)return`${min}分前`;if(min<1440)return`${Math.floor(min/60)}時間前`;return`${Math.floor(min/1440)}日前`;}
 /* 実ニュース（バックエンドのcronが毎日収集したもの）: API接続時のみ取得。未接続はサンプルのまま。 */
@@ -925,6 +950,11 @@ function renderSide(){
   }
   nav.appendChild(gn);
   const g2=el("div","grp");g2.appendChild(el("div","ttl","マイページ"));
+  const lib=el("button","navitem"+(state.route==="mylib"?" active":""));
+  const libN=libNotesCount()+libOutputsCount();
+  lib.innerHTML=`<span class="ic">🗂️</span><span>マイライブラリ</span>`+(libN?`<span class="ct tnum">${libN}</span>`:`<span class="newtag">NEW</span>`);
+  lib.onclick=()=>{state.route="mylib";renderAll();window.scrollTo(0,0);};
+  g2.appendChild(lib);
   const mb=el("button","navitem"+(state.route==="mine"?" active":""));
   mb.innerHTML=`<span class="ic">🤖</span><span>マイエージェント</span>`+(myCount()?`<span class="ct tnum">${myCount()}</span>`:`<span class="newtag">NEW</span>`);
   mb.onclick=()=>{state.route="mine";renderAll();window.scrollTo(0,0);};
@@ -1180,7 +1210,7 @@ function openWorkflowRunModal(w){
       });
       lines.push(`\n＝ 最終成果物 ＝\n${cur}`);text=lines.join("\n");out.textContent=text;
     }
-    if(text)wireOutputActions(()=>out.textContent,`${w.name}.txt`);
+    if(text)wireOutputActions(()=>out.textContent,`${w.name}.txt`,conn?w.name:null);
   };
 }
 function renderFlow(){
@@ -1209,7 +1239,8 @@ function renderFlow(){
   runbox.innerHTML=`<div class="reqfield"><label>最初の入力（${w.steps[0].in}）</label><textarea id="wfIn" placeholder="ここに入力"></textarea></div>
     <button class="btn get" id="wfGo" style="width:auto;padding:11px 20px">${conn?"▶ ワークフローを実行":"▶ サンプルで実行"}</button>
     <div class="output" id="wfOut" style="margin-top:14px;display:none"></div>
-    <div id="wfActs" style="display:none;gap:10px;margin-top:12px;flex-wrap:wrap"><button class="btn get" id="wfCopy" style="flex:1">コピー</button><button class="btn use" id="wfDl" style="flex:1;margin-top:0">📄 テキストで保存</button><button class="btn use" id="wfDlXls" style="flex:1;margin-top:0">📊 Excelで保存</button></div>`;
+    <div id="wfActs" style="display:none;gap:10px;margin-top:12px;flex-wrap:wrap"><button class="btn get" id="wfCopy" style="flex:1">コピー</button><button class="btn use" id="wfDl" style="flex:1;margin-top:0">📄 テキストで保存</button><button class="btn use" id="wfDlXls" style="flex:1;margin-top:0">📊 Excelで保存</button></div>
+    <div id="wfSaved" style="display:none;font-size:11.5px;color:var(--muted);margin-top:8px">📚 マイライブラリに自動保存しました</div>`;
   wrap.appendChild(runbox);
   v.appendChild(wrap);
   $("#wfGo").onclick=async()=>{
@@ -1227,7 +1258,8 @@ function renderFlow(){
       });
       lines.push(`\n＝ 最終成果物 ＝\n${cur}`);text=lines.join("\n");out.textContent=text;
     }
-    if(text){const a=$("#wfActs");if(a)a.style.display="flex";const cp=$("#wfCopy");if(cp)cp.onclick=async()=>{try{await navigator.clipboard.writeText(out.textContent);toast("コピーしました");}catch(e){toast("コピーは公開URLで可能","📋");}};const dl=$("#wfDl");if(dl)dl.onclick=()=>downloadText(`${w.name}.txt`,out.textContent);const dx=$("#wfDlXls");if(dx)dx.onclick=()=>downloadCSV(`${w.name}.csv`,out.textContent);}
+    if(text){const a=$("#wfActs");if(a)a.style.display="flex";const cp=$("#wfCopy");if(cp)cp.onclick=async()=>{try{await navigator.clipboard.writeText(out.textContent);toast("コピーしました");}catch(e){toast("コピーは公開URLで可能","📋");}};const dl=$("#wfDl");if(dl)dl.onclick=()=>downloadText(`${w.name}.txt`,out.textContent);const dx=$("#wfDlXls");if(dx)dx.onclick=()=>downloadCSV(`${w.name}.csv`,out.textContent);
+      if(conn){addLibraryItem("output",w.name,out.textContent,{name:w.name});const sv=$("#wfSaved");if(sv)sv.style.display="block";}}
   };
 }
 
@@ -1399,13 +1431,18 @@ function outputActions(getText,filename){
        <button class="btn get" id="copyOut" style="flex:1">コピー</button>
        <button class="btn use" id="dlOut" style="flex:1;margin-top:0">📄 テキストで保存</button>
        <button class="btn use" id="dlXls" style="flex:1;margin-top:0">📊 Excelで保存</button>
-     </div>`;
+     </div>
+     <div id="runSaved" style="display:none;font-size:11.5px;color:var(--muted);margin-top:8px">📚 マイライブラリに自動保存しました</div>`;
 }
-function wireOutputActions(getText,filename){
+function wireOutputActions(getText,filename,libTitle){
   const acts=$("#runActs");if(acts)acts.style.display="flex";
   const cp=$("#copyOut");if(cp)cp.onclick=async()=>{try{await navigator.clipboard.writeText(getText());toast("コピーしました");}catch(e){toast("コピーは公開URLで可能です","📋");}};
   const dl=$("#dlOut");if(dl)dl.onclick=()=>downloadText(filename,getText());
   const dx=$("#dlXls");if(dx)dx.onclick=()=>downloadCSV(filename.replace(/\.txt$/,"")+".csv",getText());
+  if(libTitle){
+    addLibraryItem("output",libTitle,getText(),{name:libTitle});
+    const sv=$("#runSaved");if(sv)sv.style.display="block";
+  }
 }
 function openRun(t){
   const io=ioOf(t)||{in:"入力",out:"成果物"};const conn=apiConnected();
@@ -1419,7 +1456,7 @@ function openRun(t){
     let text;
     if(conn){text=await callAgentApi(`/v1/agents/${t.id}/run`,{input,context:bizContext()},out);}
     else{text=`【${t.name}】出力サンプル（プロトタイプ）\n\n― ${io.out} ―\n\n入力: ${input||"（未入力）"}\n\n※ 未接続のためサンプルです。設定でAPIを繋ぐと実際の成果物が生成されます。`;out.textContent=text;}
-    if(text)wireOutputActions(()=>out.textContent,`${t.name}.txt`);
+    if(text)wireOutputActions(()=>out.textContent,`${t.name}.txt`,conn?t.name:null);
   };
 }
 function openUpsell(){
@@ -1556,6 +1593,74 @@ function openRequestForm(name,cat){
     toast("リクエストを送信しました。検証後、承認キューに並びます","🛠️");renderAll();
   };
 }
+/* マイライブラリ: 自分専用のメモ＋エージェント実行のたびに自動で溜まる成果物アーカイブ（ブラウザ内保存） */
+function libNoteCard(n){
+  const c=el("div","libcard");
+  c.innerHTML=`<details><summary><span class="lct">📝 ${n.title}</span><span class="lcd">${fmtDate(n.createdAt)}</span></summary>
+    <div class="output lcbody">${n.body.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</div>
+    <div class="lcacts"><button class="btn use lcdel" style="flex:1;margin-top:0">🗑 削除</button></div></details>`;
+  c.querySelector(".lcdel").onclick=e=>{e.preventDefault();e.stopPropagation();if(confirm("このメモを削除しますか？")){deleteLibraryItem(n.id);renderMyLibrary();}};
+  return c;
+}
+function libOutputCard(o){
+  const c=el("div","libcard");
+  const src=o.meta&&o.meta.name?o.meta.name:"";
+  c.innerHTML=`<details><summary><span class="lct">📦 ${o.title}</span><span class="lcd">${fmtDate(o.createdAt)}</span></summary>
+    ${src?`<div style="font-size:11px;color:var(--faint);margin-top:6px">実行元: ${src}</div>`:""}
+    <div class="output lcbody">${o.body.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</div>
+    <div class="lcacts">
+      <button class="btn get lccopy" style="flex:1">コピー</button>
+      <button class="btn use lctxt" style="flex:1;margin-top:0">📄 テキスト</button>
+      <button class="btn use lcxls" style="flex:1;margin-top:0">📊 Excel</button>
+      <button class="btn use lcdel" style="flex:1;margin-top:0">🗑 削除</button>
+    </div></details>`;
+  c.querySelector(".lccopy").onclick=async e=>{e.preventDefault();try{await navigator.clipboard.writeText(o.body);toast("コピーしました");}catch(err){toast("コピーは公開URLで可能です","📋");}};
+  c.querySelector(".lctxt").onclick=e=>{e.preventDefault();downloadText(`${o.title}.txt`,o.body);};
+  c.querySelector(".lcxls").onclick=e=>{e.preventDefault();downloadCSV(`${o.title}.csv`,o.body);};
+  c.querySelector(".lcdel").onclick=e=>{e.preventDefault();if(confirm("この成果物を削除しますか？")){deleteLibraryItem(o.id);renderMyLibrary();}};
+  return c;
+}
+function renderMyLibrary(){
+  const v=$("#view");v.innerHTML="";
+  v.appendChild(el("div","crumb",`<b>マイページ</b> / マイライブラリ`));
+  const head=el("div","libhead");head.innerHTML=`<h1><span>🗂️</span> マイライブラリ</h1>`;
+  v.appendChild(head);
+  v.appendChild(el("p","libsub","あなた専用の場所です。気づいたことをメモに残せます。エージェントやワークフローを実行すると、成果物はここに自動で溜まっていきます。"));
+
+  const tabs=el("div","seg");tabs.style.cssText="display:inline-flex;margin-bottom:16px";
+  tabs.innerHTML=`<button class="${state.libTab!=="output"?"active":""}" data-t="note">📝 メモ (${libNotesCount()})</button><button class="${state.libTab==="output"?"active":""}" data-t="output">📦 成果物 (${libOutputsCount()})</button>`;
+  tabs.querySelectorAll("button").forEach(b=>b.onclick=()=>{state.libTab=b.dataset.t;renderMyLibrary();});
+  v.appendChild(tabs);
+
+  const wrap=el("div");wrap.style.maxWidth="760px";
+
+  if(state.libTab!=="output"){
+    const box=el("div","reqfield");
+    box.innerHTML=`<label>新しいメモ</label>
+      <input id="noteTitle" placeholder="タイトル（任意）" style="margin-bottom:8px">
+      <textarea id="noteBody" placeholder="気づいたこと・議事録・アイデアなど、自由に書いてください" style="min-height:100px"></textarea>
+      <button class="btn get" id="noteSave" style="margin-top:10px;width:auto;padding:9px 18px">＋ メモを保存</button>`;
+    wrap.appendChild(box);
+    const notes=getLibrary().filter(x=>x.kind==="note");
+    if(!notes.length)wrap.appendChild(el("p","libsub","まだメモはありません。"));
+    notes.forEach(n=>wrap.appendChild(libNoteCard(n)));
+  }else{
+    const outs=getLibrary().filter(x=>x.kind==="output");
+    if(!outs.length)wrap.appendChild(el("p","libsub","エージェントを実行すると、ここに成果物が自動で溜まっていきます。"));
+    outs.forEach(o=>wrap.appendChild(libOutputCard(o)));
+  }
+  v.appendChild(wrap);
+
+  const sv=$("#noteSave");
+  if(sv)sv.onclick=()=>{
+    const title=($("#noteTitle").value||"").trim()||"無題のメモ";
+    const body=($("#noteBody").value||"").trim();
+    if(!body){toast("本文を入力してください");return;}
+    addLibraryItem("note",title,body,{});
+    toast("メモを保存しました","📝");
+    renderMyLibrary();
+  };
+}
 /* 承認キュー（下書き→人が承認で正式公開） */
 function renderReview(){
   const v=$("#view");v.innerHTML="";
@@ -1617,6 +1722,7 @@ function renderAll(){
   else if(state.route==="flow")renderFlow();
   else if(state.route==="plans")renderPlans();
   else if(state.route==="profile")renderProfile();
+  else if(state.route==="mylib")renderMyLibrary();
   else if(state.route==="free")renderFree();
   else if(state.route==="review")renderReview();
   else renderLibrary();
