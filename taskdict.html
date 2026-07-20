@@ -68,6 +68,19 @@
   .midh .ln{flex:1;height:1px;background:var(--line)}
 
   .cards.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(228px,1fr));gap:18px}
+  /* ワークフロー選択：Trelloのカード型（縦長）を横スライドで選ぶ形式（会議決定に準拠） */
+  .flowcarousel{display:flex;gap:16px;overflow-x:auto;padding:4px 4px 16px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+  .flowcarousel::-webkit-scrollbar{height:7px}
+  .flowcarousel::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:4px}
+  .flowposter{flex:0 0 216px;scroll-snap-align:start;border-radius:18px;overflow:hidden;cursor:pointer;border:1px solid var(--line);background:var(--surface);box-shadow:var(--shadow);display:flex;flex-direction:column;transition:transform .16s,box-shadow .16s;text-align:left;padding:0}
+  .flowposter:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg)}
+  .flowposter .fthumb{height:170px;display:flex;flex-direction:column;justify-content:space-between;padding:14px;color:#fff;position:relative}
+  .flowposter .fglyph{font-size:34px;align-self:center;margin:auto 0}
+  .flowposter .fbadge{align-self:flex-start;background:rgba(255,255,255,.22);backdrop-filter:blur(2px);font-size:11px;font-weight:800;padding:4px 9px;border-radius:99px}
+  .flowposter .fbody{padding:14px;flex:1;display:flex;flex-direction:column}
+  .flowposter .ftitle{font-weight:800;font-size:14px;line-height:1.4;margin-bottom:6px;color:var(--ink)}
+  .flowposter .fmeta{font-size:12px;color:var(--muted);line-height:1.6}
+  .flowhint{font-size:12px;color:var(--faint);margin:-6px 0 14px;display:flex;align-items:center;gap:6px}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow);transition:transform .16s,box-shadow .16s,border-color .16s;text-align:left;width:100%;padding:0;display:flex;flex-direction:column}
   .card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg);border-color:var(--line-strong)}
   .thumb{aspect-ratio:16/9;position:relative;display:grid;place-items:center;color:#fff}
@@ -1184,15 +1197,16 @@ function renderFlows(){
   const head=el("div","libhead");head.innerHTML=`<h1><span>🔗</span> 連携ワークフロー（スキル図）</h1>`;
   head.appendChild(el("span","count",`${WORKFLOWS.length} 本`));v.appendChild(head);
   v.appendChild(el("p","libsub","万能な1体ではなく、<b>タスクに特化した複数のエージェントを直列で連携</b>させ、業務を丸ごと自動化します。各工程の「入力→出力」がつながって1つの成果になります。"));
-  const grid=el("div","cards grid");
+  v.appendChild(el("div","flowhint","👉 カードを横にスライドして選べます"));
+  const carousel=el("div","flowcarousel");
   WORKFLOWS.forEach(w=>{
-    const card=el("button","card");
-    card.innerHTML=`<div class="thumb" style="background:${w.grad}"><span class="stat ready">🔗 連携</span><span class="glyph">🔗</span><span class="code">${w.steps.length}体</span></div>
-      <div class="body"><div class="title">${w.name}</div><div class="meta">${w.desc}</div></div>`;
+    const card=el("button","flowposter");
+    card.innerHTML=`<div class="fthumb" style="background:${w.grad}"><span class="fbadge">🔗 ${w.steps.length}体連携</span><span class="fglyph">🔗</span></div>
+      <div class="fbody"><div class="ftitle">${w.name}</div><div class="fmeta">${w.desc}</div></div>`;
     card.onclick=()=>{state.route="flow";state.flowId=w.id;renderAll();window.scrollTo(0,0);};
-    grid.appendChild(card);
+    carousel.appendChild(card);
   });
-  v.appendChild(grid);
+  v.appendChild(carousel);
 }
 function renderFlow(){
   const w=WORKFLOWS.find(x=>x.id===state.flowId);if(!w){state.route="flows";return renderFlows();}
