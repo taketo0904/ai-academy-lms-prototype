@@ -103,3 +103,84 @@ create policy "published_agents visible to same org" on published_agents for sel
 
 create policy "agent_drafts visible to same org" on agent_drafts for select
   using (organization_id in (select organization_id from memberships where user_id = auth.uid()));
+
+-- ============================================================
+-- マイライブラリ（メモ・会話・成果物）。個人所有＝本人にしか見えない。
+-- 今はブラウザのlocalStorageだけにあるものを、アカウントに紐づけて永続化・端末間で共有する。
+-- ============================================================
+
+create table library_notes (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references organizations(id) on delete cascade,
+  user_id uuid not null references profiles(id) on delete cascade,
+  title text not null,
+  body text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table library_conversations (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references organizations(id) on delete cascade,
+  user_id uuid not null references profiles(id) on delete cascade,
+  title text not null,
+  agent_id text,
+  messages jsonb not null default '[]',  -- [{role:"user"|"assistant", content:"..."}]
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table library_outputs (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references organizations(id) on delete cascade,
+  user_id uuid not null references profiles(id) on delete cascade,
+  title text not null,
+  source_name text,  -- 実行元のエージェント/ワークフロー名
+  body text not null,
+  created_at timestamptz not null default now()
+);
+
+create index idx_library_notes_user on library_notes (user_id, created_at desc);
+create index idx_library_conversations_user on library_conversations (user_id, updated_at desc);
+create index idx_library_outputs_user on library_outputs (user_id, created_at desc);
+
+alter table library_notes enable row level security;
+alter table library_conversations enable row level security;
+alter table library_outputs enable row level security;
+
+create policy "own notes only" on library_notes for all
+  using (user_id = auth.uid());
+create policy "own conversations only" on library_conversations for all
+  using (user_id = auth.uid());
+create policy "own outputs only" on library_outputs for all
+  using (user_id = auth.uid());
+
+-- ============================================================
+-- 接続サービス（Yoom型: 利用者本人が自分のGitHub/Notion/Google Driveなどを
+-- OAuthで接続する）。トークンは本人にしか見えない（RLS）＋バックエンドの
+-- service_roleキー経由でのみエージェント実行時に読み出す想定。
+-- 注意: 現状は平文保存。本番運用でトークン件数が増える場合はSupabase Vault
+-- （pgsodium暗号化）への移行を検討すること（初期版のスコープ外として保留）。
+-- ============================================================
+
+create table connected_accounts (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references organizations(id) on delete cascade,
+  user_id uuid not null references profiles(id) on delete cascade,
+  provider text not null check (provider in ('github', 'notion', 'google')),
+  account_label text,       -- 表示用（例: GitHubのユーザー名／Notionワークスペース名）
+  access_token text not null,
+  refresh_token text,
+  expires_at timestamptz,
+  scopes text[] default '{}',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, provider)
+);
+
+create index idx_connected_accounts_user on connected_accounts (user_id);
+
+alter table connected_accounts enable row level security;
+
+create policy "own connections only" on connected_accounts for all
+  using (user_id = auth.uid());
