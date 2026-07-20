@@ -350,6 +350,18 @@
   .ntag{font-size:11px;font-weight:700;color:var(--accent-ink);background:var(--accent-wash);padding:3px 9px;border-radius:20px;border:none;cursor:pointer}
   .ntag:hover{background:#e0dcf7}
   @media(max-width:760px){.layout{grid-template-columns:1fr}.side{display:none}.main{padding:18px}}
+
+  .authwrap{position:fixed;inset:0;background:var(--canvas);z-index:200;display:grid;place-items:center;padding:20px}
+  .authwrap.hidden{display:none}
+  .authcard{background:#fff;border-radius:18px;padding:32px;width:100%;max-width:380px;box-shadow:var(--shadow-lg);text-align:center}
+  .authcard .logo{justify-content:center;margin-bottom:22px}
+  .authtabs{display:flex;background:var(--canvas);border:1px solid var(--line);border-radius:9px;padding:3px;gap:2px;margin-bottom:20px}
+  .authtabs button{flex:1;border:none;background:transparent;padding:8px 0;border-radius:6px;font-size:13px;font-weight:700;color:var(--muted)}
+  .authtabs button.active{background:var(--accent);color:#fff}
+  .authcard .reqfield{margin-bottom:12px}
+  .authcard .btn{width:100%;justify-content:center;padding:11px 0;border-radius:9px;font-size:14px;font-weight:700;border:none;margin-top:6px}
+  .autherr{font-size:12.5px;color:var(--coral);margin:-4px 0 12px;text-align:left;min-height:1em}
+  .authcard .aftertitle{font-size:12px;color:var(--faint);margin-top:16px}
 </style>
 
 <div class="topbar">
@@ -362,7 +374,7 @@
   <button class="planchip" id="planChip"></button>
   <button class="icobtn" id="diagBtn" title="業務診断">🧭</button>
   <button class="icobtn" title="お知らせ">🔔<span class="badge">3</span></button>
-  <div class="avatar">中川</div>
+  <button class="avatar" id="avatarBtn" title="ログアウト" style="border:none">中川</button>
 </div>
 
 <div class="layout">
@@ -370,7 +382,90 @@
   <main class="main" id="view"></main>
 </div>
 
+<div class="authwrap hidden" id="authScreen">
+  <div class="authcard">
+    <div class="logo"><span class="dot">◎</span><span>TASK AGENTS<small>業務AIエージェント辞書</small></span></div>
+    <div class="authtabs">
+      <button class="active" id="authTabLogin">ログイン</button>
+      <button id="authTabSignup">新規登録</button>
+    </div>
+    <div class="reqfield"><label>メールアドレス</label><input id="authEmail" type="email" autocomplete="email" placeholder="you@company.com"></div>
+    <div class="reqfield"><label>パスワード</label><input id="authPass" type="password" autocomplete="current-password" placeholder="8文字以上"></div>
+    <div class="autherr" id="authErr"></div>
+    <button class="btn get" id="authSubmit">ログイン</button>
+    <div class="aftertitle" id="authNote"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+/* アカウント基盤（Supabase Auth）。ログインするまで下のアプリ本体は authScreen の裏に隠れている。 */
+const SUPABASE_URL="https://mmlmpjklltdioanpnxpf.supabase.co";
+const SUPABASE_ANON_KEY="sb_publishable_uVb0ok44rXQnhdbs2UkmQQ_rbLrc2SB";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+let currentUser=null,authMode="login",appStarted=false;
+
+function setAuthMode(m){
+  authMode=m;
+  document.getElementById("authTabLogin").classList.toggle("active",m==="login");
+  document.getElementById("authTabSignup").classList.toggle("active",m==="signup");
+  document.getElementById("authSubmit").textContent=m==="login"?"ログイン":"新規登録";
+  document.getElementById("authPass").setAttribute("autocomplete",m==="login"?"current-password":"new-password");
+  document.getElementById("authNote").textContent=m==="signup"?"登録後、確認メールのリンクをクリックしてください。":"";
+  document.getElementById("authErr").textContent="";
+}
+document.getElementById("authTabLogin").onclick=()=>setAuthMode("login");
+document.getElementById("authTabSignup").onclick=()=>setAuthMode("signup");
+
+async function submitAuth(){
+  const email=(document.getElementById("authEmail").value||"").trim();
+  const pass=document.getElementById("authPass").value||"";
+  const errEl=document.getElementById("authErr");
+  errEl.textContent="";
+  if(!email||!pass){errEl.textContent="メールアドレスとパスワードを入力してください。";return;}
+  const btn=document.getElementById("authSubmit");
+  btn.disabled=true;const orig=btn.textContent;btn.textContent="処理中...";
+  try{
+    if(authMode==="login"){
+      const {error}=await sb.auth.signInWithPassword({email,password:pass});
+      if(error)throw error;
+    }else{
+      const {error}=await sb.auth.signUp({email,password:pass});
+      if(error)throw error;
+      errEl.style.color="var(--green)";
+      errEl.textContent="登録しました。確認メールのリンクをクリックしてからログインしてください。";
+      errEl.style.color="";
+    }
+  }catch(e){
+    errEl.textContent=e.message==="Invalid login credentials"?"メールアドレスまたはパスワードが違います。":(e.message||"エラーが発生しました。");
+  }finally{
+    btn.disabled=false;btn.textContent=orig;
+  }
+}
+document.getElementById("authSubmit").onclick=submitAuth;
+document.getElementById("authPass").addEventListener("keydown",e=>{if(e.key==="Enter")submitAuth();});
+
+async function ensureProfile(user){
+  await sb.from("profiles").upsert({id:user.id,display_name:(user.email||"").split("@")[0]},{onConflict:"id"});
+}
+function showAuthScreen(){document.getElementById("authScreen").classList.remove("hidden");}
+function hideAuthScreen(){document.getElementById("authScreen").classList.add("hidden");}
+async function onAuthed(user){
+  currentUser=user;
+  hideAuthScreen();
+  const av=document.querySelector(".avatar");if(av)av.textContent=(user.email||"?").slice(0,2).toUpperCase();
+  await ensureProfile(user);
+  if(!appStarted){appStarted=true;renderAll();maybeShowOnboarding();}
+}
+async function initAuth(){
+  const {data:{session}}=await sb.auth.getSession();
+  if(session)onAuthed(session.user);else showAuthScreen();
+  sb.auth.onAuthStateChange((event,session)=>{
+    if(session)onAuthed(session.user);
+    else{currentUser=null;showAuthScreen();}
+  });
+}
+
 /* データ構造: IPA iCD タスク辞書準拠（大分類→中分類→タスク）。代表例。 */
 const CATS = [
   {code:"all",  label:"すべての業務", icon:"▦", grad:"linear-gradient(135deg,#5B4BE1,#8b7bf0)"},
@@ -1959,6 +2054,7 @@ $("#diagBtn").onclick=openDiag;
 $("#planChip").onclick=()=>{state.route="plans";renderAll();window.scrollTo(0,0);};
 $("#segLib").onclick=()=>{state.route="library";renderAll();};
 $("#segMine").onclick=()=>{state.route="mine";renderAll();};
+$("#avatarBtn").onclick=()=>{if(confirm("ログアウトしますか？"))sb.auth.signOut();};
 
 const myCount=()=>[...owned].filter(id=>{const t=taskById(id);return t&&t.agent;}).length;
 function renderAll(){
@@ -2003,6 +2099,5 @@ function maybeShowOnboarding(){
   });
   const skip=$("#onboardSkip");if(skip)skip.onclick=()=>{localStorage.setItem(ONBOARD_KEY,"1");$("#mscrim").classList.remove("on");};
 }
-renderAll();
-maybeShowOnboarding();
+initAuth();
 </script>
