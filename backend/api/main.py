@@ -1,7 +1,7 @@
 """
 サービス側API（プラットフォーム内完結エージェント実行）。
 
-- 単体エージェント:   POST /v1/agents/{id}/run     body {"input": "...", "context": "..."}  → ストリーミング(text/plain)
+- 単体エージェント:   POST /v1/agents/{id}/run     body {"input": "...", "context": "..."}  → ストリーミング(生テキスト。text/event-streamを名乗るのはCDNのバッファリング回避のため)
 - 連携ワークフロー:   POST /v1/workflows/{id}/run  body {"input": "...", "context": "..."}  → 各ステップを直列連携
   ※ context はユーザーの会社・事業に関する自由記述（パーソナライズ設定）。system プロンプトに含めて成果物の質を上げる。
 - ニュース投稿:       POST /v1/news/ingest         body {"items": [...]}  → cronジョブ専用（要 x-api-key = CRON_KEY）
@@ -130,8 +130,8 @@ def run_agent(agent_id: str, req: RunRequest, x_api_key: str | None = Header(def
         raise HTTPException(status_code=404, detail="agent not found")
     if req.messages:
         msgs = [{"role": m.get("role", "user"), "content": m.get("content", "")} for m in req.messages if m.get("content")]
-        return StreamingResponse(_run_chat(agent, msgs, req.context), media_type="text/plain; charset=utf-8", headers=_STREAM_HEADERS)
-    return StreamingResponse(_run(agent, req.input, req.context), media_type="text/plain; charset=utf-8", headers=_STREAM_HEADERS)
+        return StreamingResponse(_run_chat(agent, msgs, req.context), media_type="text/event-stream", headers=_STREAM_HEADERS)
+    return StreamingResponse(_run(agent, req.input, req.context), media_type="text/event-stream", headers=_STREAM_HEADERS)
 
 
 @app.post("/v1/workflows/{wf_id}/run")
@@ -152,7 +152,7 @@ def run_workflow(wf_id: str, req: RunRequest, x_api_key: str | None = Header(def
             payload = out  # 前段の出力を次段の入力へ
         yield "\n＝ 最終成果物は上記の最終ステップ出力です ＝\n"
 
-    return StreamingResponse(gen(), media_type="text/plain; charset=utf-8", headers=_STREAM_HEADERS)
+    return StreamingResponse(gen(), media_type="text/event-stream", headers=_STREAM_HEADERS)
 
 
 @app.post("/v1/news/ingest")
