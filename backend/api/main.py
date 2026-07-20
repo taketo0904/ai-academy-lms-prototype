@@ -116,6 +116,12 @@ def _run_chat(agent: dict, messages: list[dict], biz_context: str = "") -> Itera
             yield text
 
 
+# Render の手前に Cloudflare が入っており、圧縮のためレスポンス全体をバッファしてしまうと
+# ストリーミングが効かず「実行中…」のまま固まって見える。no-transform でCDN側の変換（圧縮）を止め、
+# X-Accel-Buffering: no でプロキシのバッファリングを止める（両方指定しないと片方だけでは効かないことがある）。
+_STREAM_HEADERS = {"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"}
+
+
 @app.post("/v1/agents/{agent_id}/run")
 def run_agent(agent_id: str, req: RunRequest, x_api_key: str | None = Header(default=None)):
     _auth(x_api_key)
@@ -124,8 +130,8 @@ def run_agent(agent_id: str, req: RunRequest, x_api_key: str | None = Header(def
         raise HTTPException(status_code=404, detail="agent not found")
     if req.messages:
         msgs = [{"role": m.get("role", "user"), "content": m.get("content", "")} for m in req.messages if m.get("content")]
-        return StreamingResponse(_run_chat(agent, msgs, req.context), media_type="text/plain; charset=utf-8")
-    return StreamingResponse(_run(agent, req.input, req.context), media_type="text/plain; charset=utf-8")
+        return StreamingResponse(_run_chat(agent, msgs, req.context), media_type="text/plain; charset=utf-8", headers=_STREAM_HEADERS)
+    return StreamingResponse(_run(agent, req.input, req.context), media_type="text/plain; charset=utf-8", headers=_STREAM_HEADERS)
 
 
 @app.post("/v1/workflows/{wf_id}/run")
@@ -146,7 +152,7 @@ def run_workflow(wf_id: str, req: RunRequest, x_api_key: str | None = Header(def
             payload = out  # 前段の出力を次段の入力へ
         yield "\n＝ 最終成果物は上記の最終ステップ出力です ＝\n"
 
-    return StreamingResponse(gen(), media_type="text/plain; charset=utf-8")
+    return StreamingResponse(gen(), media_type="text/plain; charset=utf-8", headers=_STREAM_HEADERS)
 
 
 @app.post("/v1/news/ingest")
