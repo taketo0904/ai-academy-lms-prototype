@@ -31,6 +31,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from .agents import AGENTS, WORKFLOWS, system_for
+from .security import auth_or_401 as _auth
+from . import superagent
 
 client = anthropic.Anthropic()  # ANTHROPIC_API_KEY を環境から解決
 app = FastAPI(title="Task Agents API", version="1.0")
@@ -44,11 +46,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_ACCESS_KEY = os.getenv("API_ACCESS_KEY", "")
 _CRON_KEY = os.getenv("CRON_KEY", "")
 
 _NEWS_MAX = 50
 _news_store: list[dict] = []
+
+app.include_router(superagent.router)
 
 
 class RunRequest(BaseModel):
@@ -68,12 +71,6 @@ class NewsItem(BaseModel):
 
 class NewsIngestRequest(BaseModel):
     items: list[NewsItem]
-
-
-def _auth(x_api_key: str | None) -> None:
-    # API_ACCESS_KEY を設定したときだけ認証を要求（未設定なら誰でも可＝まず動かす用）
-    if _ACCESS_KEY and x_api_key != _ACCESS_KEY:
-        raise HTTPException(status_code=401, detail="invalid api key")
 
 
 def _auth_cron(x_api_key: str | None) -> None:

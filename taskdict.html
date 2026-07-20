@@ -369,6 +369,7 @@
   <div class="seg">
     <button class="active" id="segLib">業務辞書</button>
     <button id="segMine">マイエージェント</button>
+    <button id="segSuper">🚀 何でも作る</button>
   </div>
   <div class="spacer"></div>
   <button class="planchip" id="planChip"></button>
@@ -1959,11 +1960,133 @@ function libConvCard(cv){
       <button class="btn use lcdoc" style="flex:1;margin-top:0">📝 Word</button>
       <button class="btn use lcdel" style="flex:1;margin-top:0">🗑 削除</button>
     </div></details>`;
-  c.querySelector(".lccont").onclick=e=>{e.preventDefault();continueConversation(cv);};
+  c.querySelector(".lccont").onclick=e=>{e.preventDefault();if(cv.meta&&cv.meta.superagent)openSuperFromLibrary(cv);else continueConversation(cv);};
   c.querySelector(".lctxt").onclick=e=>{e.preventDefault();downloadText(`${cv.title}_会話.txt`,transcript);};
   c.querySelector(".lcdoc").onclick=e=>{e.preventDefault();downloadWord(`${cv.title}_会話.doc`,`${cv.title}の会話`,transcript);};
   c.querySelector(".lcdel").onclick=e=>{e.preventDefault();if(confirm("この会話を削除しますか？")){deleteLibraryItem(cv.id);renderMyLibrary();}};
+  if(cv.meta&&cv.meta.superagent){
+    c.querySelector(".lct").textContent="🚀 "+cv.title;
+    const files=cv.meta.files||[];
+    if(files.length){
+      const fb=el("div","lcacts",files.map(f=>`<button class="btn use superfile2" style="margin-top:0;flex:none" data-id="${f.id}" data-name="${(f.filename||"file").replace(/"/g,'&quot;')}">⬇️ ${f.filename}</button>`).join(""));
+      fb.style.cssText="flex-wrap:wrap;margin-top:8px";
+      c.querySelector("details").insertBefore(fb,c.querySelector(".lcacts"));
+      fb.querySelectorAll(".superfile2").forEach(b=>b.onclick=e=>{e.preventDefault();downloadSuperFile(b.dataset.id,b.dataset.name);});
+    }
+  }
   return c;
+}
+/* =====================================================================
+   スーパーエージェント（Genspark型・多形式生成）: プロンプト1つでコードを実行・検証しながら
+   アプリ／資料／スプレッドシート等を作る。Managed Agents(beta)をバックエンド経由で呼ぶ。
+   やり取りと生成物はマイライブラリの「会話」に自動で溜まっていく。
+   ===================================================================== */
+const SUPER_EXAMPLE="問い合わせメールの内容を自動分類してSlackへ通知するツールを作って。分類は「見積」「クレーム」「その他」の3種類。";
+let superState={sessionId:null,messages:[],libId:null,running:false,files:[]};
+/* ストリームの先頭行 [[SESSION_ID:...]] を都度剥がしながら表示テキストを組み立てる */
+async function callSuperAgentApi(path,body,onChunk){
+  const base=getApiBase().replace(/\/$/,"");const key=getApiKey();
+  try{
+    const res=await fetch(base+path,{method:"POST",headers:{"content-type":"application/json",...(key?{"x-api-key":key}:{})},body:JSON.stringify(body)});
+    if(!res.ok)return{ok:false,error:`HTTP ${res.status}`,sessionId:null,text:""};
+    if(!(res.body&&res.body.getReader))return{ok:false,error:"ストリーミング非対応の応答でした",sessionId:null,text:""};
+    const reader=res.body.getReader();const dec=new TextDecoder();let raw="",sessionId=null,display="";
+    for(;;){
+      const {done,value}=await reader.read();if(done)break;
+      raw+=dec.decode(value,{stream:true});
+      display=raw;
+      const m=display.match(/^\[\[SESSION_ID:([^\]]+)\]\]\n/);
+      if(m){sessionId=m[1];display=display.slice(m[0].length);}
+      onChunk(display,sessionId);
+    }
+    return{ok:true,error:null,sessionId,text:display};
+  }catch(e){return{ok:false,error:e.message,sessionId:null,text:""};}
+}
+async function downloadSuperFile(fileId,filename){
+  const base=getApiBase().replace(/\/$/,"");const key=getApiKey();
+  try{
+    const res=await fetch(`${base}/v1/superagent/files/${fileId}`,{headers:key?{"x-api-key":key}:{}});
+    if(!res.ok){toast("ダウンロードに失敗しました");return;}
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");a.href=url;a.download=filename||"file";document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }catch(e){toast("ダウンロードに失敗しました");}
+}
+async function refreshSuperFiles(){
+  const box=$("#superFiles");if(!superState.sessionId)return;
+  const base=getApiBase().replace(/\/$/,"");const key=getApiKey();
+  try{
+    const res=await fetch(`${base}/v1/superagent/sessions/${superState.sessionId}/files`,{headers:key?{"x-api-key":key}:{}});
+    if(!res.ok)return;
+    const data=await res.json();
+    superState.files=data.files||[];
+    if(box)box.innerHTML=superState.files.length?`<div class="lcacts" style="flex-wrap:wrap;margin:10px 0">${superState.files.map(f=>`<button class="btn use superfile" style="margin-top:0;flex:none" data-id="${f.id}" data-name="${(f.filename||"file").replace(/"/g,'&quot;')}">⬇️ ${f.filename}</button>`).join("")}</div>`:"";
+    if(box)box.querySelectorAll(".superfile").forEach(b=>b.onclick=()=>downloadSuperFile(b.dataset.id,b.dataset.name));
+    if(superState.libId&&superState.messages.length)upsertConversation(superState.libId,superState.messages[0].content.slice(0,40),superState.messages,{superagent:true,sessionId:superState.sessionId,files:superState.files});
+  }catch(e){}
+}
+function openSuperFromLibrary(cv){
+  superState={sessionId:(cv.meta&&cv.meta.sessionId)||null,messages:cv.messages.slice(),libId:cv.id,running:false,files:(cv.meta&&cv.meta.files)||[]};
+  state.route="super";renderAll();window.scrollTo(0,0);
+}
+function renderSuper(){
+  const v=$("#view");v.innerHTML="";
+  v.appendChild(el("div","crumb",`<b>スーパーエージェント</b>`));
+  const head=el("div","libhead");head.innerHTML=`<h1><span>🚀</span> 何でも作る</h1>`;
+  v.appendChild(head);
+  v.appendChild(el("p","libsub","作りたいものを日本語で伝えるだけで、実際にコードを書いて実行・検証しながら成果物を仕上げます。アプリ・資料・スプレッドシートなど形式は自動判断。やり取りと生成物は自動でマイライブラリに溜まっていきます。"));
+  const conn=apiConnected();
+  const wrap=el("div");wrap.style.maxWidth="760px";
+  if(!conn){
+    wrap.appendChild(el("div","empty",`<div class="big">🔌</div>この機能の利用には本番API接続が必要です。<br><span style="font-size:12px">画面右上の設定からAPIのURLを接続してください。</span>`));
+    v.appendChild(wrap);return;
+  }
+  if(superState.messages.length){
+    const nb=el("button","btn use","🆕 新しく作る");
+    nb.style.cssText="width:auto;padding:7px 14px;margin:0 0 12px";
+    nb.onclick=()=>{superState={sessionId:null,messages:[],libId:null,running:false,files:[]};renderSuper();};
+    wrap.appendChild(nb);
+  }
+  wrap.innerHTML+=`<div class="chatthread" id="superThread"></div>
+    <div id="superFiles"></div>
+    <div class="reqfield" style="margin-bottom:0">
+      <label>${superState.messages.length?"続きを指示する":"作りたいものを入力"}</label>
+      ${!superState.messages.length?`<div class="examplebox"><span class="exlabel">💡 例</span><p>${SUPER_EXAMPLE}</p><button type="button" class="btn get" id="superExUse">この例を使う</button></div>`:""}
+      <div class="chatrow"><textarea id="superIn" placeholder="例: 見積書を自動作成するツールを作って（Enterで送信／Shift+Enterで改行）"></textarea>
+      <button class="btn get" id="superSend">${superState.messages.length?"送信":"作成開始"}</button></div>
+    </div>`;
+  v.appendChild(wrap);
+  const thread=$("#superThread");
+  const renderThread=()=>{thread.innerHTML=superState.messages.map(m=>chatBubbleHTML(m.role,m.content)).join("");thread.scrollTop=thread.scrollHeight;};
+  renderThread();
+  refreshSuperFiles();
+  const exUse=$("#superExUse");if(exUse)exUse.onclick=()=>{const ci=$("#superIn");ci.value=SUPER_EXAMPLE;ci.focus();ci.setSelectionRange(ci.value.length,ci.value.length);};
+  const send=async()=>{
+    const inp=$("#superIn");const text=(inp.value||"").trim();if(!text||superState.running)return;
+    inp.value="";inp.disabled=true;const btn=$("#superSend");if(btn)btn.disabled=true;
+    superState.messages.push({role:"user",content:text});renderThread();
+    thread.insertAdjacentHTML("beforeend",`<div class="chatmsg bot" id="superPending">…</div>`);thread.scrollTop=thread.scrollHeight;
+    const pending=$("#superPending");
+    superState.running=true;
+    const isFirst=!superState.sessionId;
+    const path=isFirst?"/v1/superagent/sessions/start":`/v1/superagent/sessions/${superState.sessionId}/messages`;
+    const body=isFirst?{prompt:text,context:bizContext()}:{prompt:text};
+    const result=await callSuperAgentApi(path,body,(display)=>{pending.textContent=display||"…";thread.scrollTop=thread.scrollHeight;});
+    superState.running=false;
+    if(result.sessionId)superState.sessionId=result.sessionId;
+    if(result.ok&&result.text){
+      superState.messages.push({role:"assistant",content:result.text});
+      superState.libId=upsertConversation(superState.libId,superState.messages[0].content.slice(0,40),superState.messages,{superagent:true,sessionId:superState.sessionId,files:superState.files});
+      renderThread();
+      await refreshSuperFiles();
+    }else{
+      pending.textContent=`⚠️ ${result.error||"エラーが発生しました"}`;
+    }
+    inp.disabled=false;if(btn)btn.disabled=false;inp.focus();
+  };
+  $("#superSend").onclick=send;
+  $("#superIn").onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}};
 }
 function renderMyLibrary(){
   const v=$("#view");v.innerHTML="";
@@ -2054,6 +2177,7 @@ $("#diagBtn").onclick=openDiag;
 $("#planChip").onclick=()=>{state.route="plans";renderAll();window.scrollTo(0,0);};
 $("#segLib").onclick=()=>{state.route="library";renderAll();};
 $("#segMine").onclick=()=>{state.route="mine";renderAll();};
+$("#segSuper").onclick=()=>{state.route="super";renderAll();};
 $("#avatarBtn").onclick=()=>{if(confirm("ログアウトしますか？"))sb.auth.signOut();};
 
 const myCount=()=>[...owned].filter(id=>{const t=taskById(id);return t&&t.agent;}).length;
@@ -2063,8 +2187,10 @@ function renderAll(){
   renderSide();
   $("#segLib").classList.toggle("active",state.route==="library"||state.route==="detail");
   $("#segMine").classList.toggle("active",state.route==="mine");
+  $("#segSuper").classList.toggle("active",state.route==="super");
   if(state.route==="detail")renderDetail();
   else if(state.route==="mine")renderMine();
+  else if(state.route==="super")renderSuper();
   else if(state.route==="news")renderNews();
   else if(state.route==="setup")renderSetup();
   else if(state.route==="lesson")renderLesson();
