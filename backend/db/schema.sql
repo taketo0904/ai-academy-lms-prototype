@@ -89,11 +89,25 @@ alter table agent_drafts enable row level security;
 create policy "org visible to members" on organizations for select
   using (id in (select organization_id from memberships where user_id = auth.uid()));
 
+-- 新規登録した本人が自分の組織を作れないと初回ログイン後に何もできなくなるため、
+-- insertだけは認証済みユーザーに開放する（作成した組織を見られるのは上のselectポリシー通りメンバーのみ）。
+create policy "authenticated users can create an org" on organizations for insert
+  with check (auth.uid() is not null);
+
 create policy "own profile visible and editable" on profiles for all
   using (id = auth.uid());
 
-create policy "memberships visible to same org" on memberships for select
-  using (organization_id in (select organization_id from memberships where user_id = auth.uid()));
+-- 注意: 当初 `organization_id in (select ... from memberships where user_id = auth.uid())` という
+-- 自己参照の書き方にしていたが、memberships自身のSELECTポリシーの中でmembershipsを再度読みに行く形になり
+-- Postgresが "infinite recursion detected in policy for relation memberships" (42P17) を返す実バグだった。
+-- 「自分のmembership行だけ見える」に単純化して回避している（同じ組織の他メンバー一覧が必要になったら
+-- SECURITY DEFINER関数越しに提供する）。
+create policy "memberships visible to own row" on memberships for select
+  using (user_id = auth.uid());
+
+-- 新規組織作成直後、本人を owner として自分自身のmembershipを1件だけ作れるようにする。
+create policy "user can create own membership" on memberships for insert
+  with check (user_id = auth.uid());
 
 create policy "usage visible to same org" on usage_records for select
   using (organization_id in (select organization_id from memberships where user_id = auth.uid()));
@@ -126,6 +140,7 @@ create table library_conversations (
   title text not null,
   agent_id text,
   messages jsonb not null default '[]',  -- [{role:"user"|"assistant", content:"..."}]
+  meta jsonb not null default '{}',  -- 例: {agentId,name} or {superagent:true,sessionId,files:[...]}
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

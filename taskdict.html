@@ -449,6 +449,24 @@ document.getElementById("authPass").addEventListener("keydown",e=>{if(e.key==="E
 async function ensureProfile(user){
   await sb.from("profiles").upsert({id:user.id,display_name:(user.email||"").split("@")[0]},{onConflict:"id"});
 }
+/* 組織はSupabase側の必須の入れ物。3人チーム共有の組織を後で運用することもできるが、
+   まずは本人専用の組織を自動で1つ作り、すぐマイライブラリ等が使える状態にする。 */
+let currentOrgId=null;
+async function ensureOrg(user){
+  if(currentOrgId)return currentOrgId;
+  const {data:mem}=await sb.from("memberships").select("organization_id").eq("user_id",user.id).limit(1);
+  if(mem&&mem.length){currentOrgId=mem[0].organization_id;return currentOrgId;}
+  // .select()で返り値を取ろうとすると、作った瞬間はまだmembershipが無くRLSのSELECTポリシーに
+  // 引っかかって「new row violates row-level security policy」になる（自分がまだメンバーでない
+  // 組織は見えない、というポリシー通りの挙動）。IDを先にクライアント側で生成してこれを回避する。
+  const newOrgId=crypto.randomUUID();
+  const {error:orgErr}=await sb.from("organizations").insert({id:newOrgId,name:(user.email||"").split("@")[0]+"の組織"});
+  if(orgErr){console.error("ensureOrg failed (org)",orgErr);return null;}
+  const {error:memErr}=await sb.from("memberships").insert({organization_id:newOrgId,user_id:user.id,role:"owner"});
+  if(memErr){console.error("ensureOrg failed (membership)",memErr);return null;}
+  currentOrgId=newOrgId;
+  return currentOrgId;
+}
 function showAuthScreen(){document.getElementById("authScreen").classList.remove("hidden");}
 function hideAuthScreen(){document.getElementById("authScreen").classList.add("hidden");}
 async function onAuthed(user){
@@ -456,6 +474,8 @@ async function onAuthed(user){
   hideAuthScreen();
   const av=document.querySelector(".avatar");if(av)av.textContent=(user.email||"?").slice(0,2).toUpperCase();
   await ensureProfile(user);
+  await ensureOrg(user);
+  await loadLibrary();
   if(!appStarted){appStarted=true;renderAll();maybeShowOnboarding();}
 }
 async function initAuth(){
@@ -1085,25 +1105,69 @@ async function callAgentApi(path,body,resultEl){
 }
 const catOf=code=>CATS.find(c=>c.code===code);
 let state={cat:"all",view:"grid",q:"",route:"library",taskId:null,level:"beg",lessonId:null,flowId:null,tag:null,libTab:"note"};
-/* マイライブラリ: 自分専用のメモ＋エージェント成果物の蓄積（ブラウザ内保存） */
-const LIB_KEY="task-mylibrary-v1";
-const getLibrary=()=>{try{return JSON.parse(localStorage.getItem(LIB_KEY)||"[]");}catch(e){return [];}};
-const setLibrary=arr=>localStorage.setItem(LIB_KEY,JSON.stringify(arr));
-function addLibraryItem(kind,title,body,meta){
-  const arr=getLibrary();
-  const item={id:"lib_"+Date.now()+"_"+Math.random().toString(36).slice(2,7),kind,title,body,createdAt:Date.now(),meta:meta||{}};
-  arr.unshift(item);setLibrary(arr);return item;
+/* マイライブラリ: 自分専用のメモ＋エージェント成果物の蓄積（Supabaseに永続化、端末をまたいで共有される）。
+   libraryCache はSupabaseの写し。読み取りは全て同期でこのキャッシュを見るので、
+   既存の呼び出し側（renderMyLibrary等）は変更不要。書き込みだけSupabaseへ非同期で反映する。 */
+let libraryCache=[];
+let libraryLoaded=false;
+async function loadLibrary(){
+  if(!currentOrgId)return;
+  const [{data:notes,error:e1},{data:convs,error:e2},{data:outs,error:e3}]=await Promise.all([
+    sb.from("library_notes").select("*").order("created_at",{ascending:false}),
+    sb.from("library_conversations").select("*").order("updated_at",{ascending:false}),
+    sb.from("library_outputs").select("*").order("created_at",{ascending:false}),
+  ]);
+  if(e1||e2||e3)console.error("loadLibrary failed",e1||e2||e3);
+  const items=[];
+  (notes||[]).forEach(r=>items.push({id:r.id,kind:"note",title:r.title,body:r.body,createdAt:+new Date(r.created_at),meta:{}}));
+  (outs||[]).forEach(r=>items.push({id:r.id,kind:"output",title:r.title,body:r.body,createdAt:+new Date(r.created_at),meta:{name:r.source_name}}));
+  (convs||[]).forEach(r=>items.push({id:r.id,kind:"conversation",title:r.title,messages:r.messages||[],createdAt:+new Date(r.created_at),updatedAt:+new Date(r.updated_at),meta:r.meta||{}}));
+  items.sort((a,b)=>(b.updatedAt||b.createdAt)-(a.updatedAt||a.createdAt));
+  libraryCache=items;
+  libraryLoaded=true;
+  if(appStarted&&(state.route==="mylib"||state.route==="super"))renderAll();
 }
-function deleteLibraryItem(id){setLibrary(getLibrary().filter(x=>x.id!==id));}
-function upsertConversation(convId,title,messages,meta){
-  const arr=getLibrary();
-  const i=convId?arr.findIndex(x=>x.id===convId):-1;
-  if(i<0){
-    const item={id:"lib_"+Date.now()+"_"+Math.random().toString(36).slice(2,7),kind:"conversation",title,messages,createdAt:Date.now(),updatedAt:Date.now(),meta:meta||{}};
-    arr.unshift(item);setLibrary(arr);return item.id;
+const getLibrary=()=>libraryCache;
+function addLibraryItem(kind,title,body,meta){
+  const item={id:"tmp_"+Date.now()+"_"+Math.random().toString(36).slice(2,7),kind,title,body,createdAt:Date.now(),meta:meta||{}};
+  libraryCache.unshift(item);
+  if(currentOrgId&&currentUser){
+    const table=kind==="note"?"library_notes":"library_outputs";
+    const row=kind==="note"
+      ?{organization_id:currentOrgId,user_id:currentUser.id,title,body}
+      :{organization_id:currentOrgId,user_id:currentUser.id,title,body,source_name:(meta&&meta.name)||null};
+    sb.from(table).insert(row).select().single().then(({data,error})=>{
+      if(error){console.error("addLibraryItem failed",error);return;}
+      item.id=data.id;
+    });
   }
-  arr[i]={...arr[i],messages,updatedAt:Date.now()};
-  setLibrary(arr);return arr[i].id;
+  return item;
+}
+function deleteLibraryItem(id){
+  const item=libraryCache.find(x=>x.id===id);
+  libraryCache=libraryCache.filter(x=>x.id!==id);
+  if(!item||String(id).startsWith("tmp_"))return;
+  const table=item.kind==="note"?"library_notes":item.kind==="output"?"library_outputs":"library_conversations";
+  sb.from(table).delete().eq("id",id).then(({error})=>{if(error)console.error("deleteLibraryItem failed",error);});
+}
+async function upsertConversation(convId,title,messages,meta){
+  const now=Date.now();
+  if(convId&&!String(convId).startsWith("tmp_")){
+    const item=libraryCache.find(x=>x.id===convId);
+    if(item){item.title=title;item.messages=messages;if(meta)item.meta=meta;item.updatedAt=now;}
+    const{error}=await sb.from("library_conversations").update({title,messages,meta:meta||{},updated_at:new Date(now).toISOString()}).eq("id",convId);
+    if(error)console.error("upsertConversation update failed",error);
+    return convId;
+  }
+  const item={id:"tmp_"+now+"_"+Math.random().toString(36).slice(2,7),kind:"conversation",title,messages,createdAt:now,updatedAt:now,meta:meta||{}};
+  libraryCache.unshift(item);
+  if(currentOrgId&&currentUser){
+    const{data,error}=await sb.from("library_conversations").insert({organization_id:currentOrgId,user_id:currentUser.id,title,messages,meta:meta||{},agent_id:(meta&&meta.agentId)||null}).select().single();
+    if(error){console.error("upsertConversation insert failed",error);return item.id;}
+    item.id=data.id;
+    return data.id;
+  }
+  return item.id;
 }
 const libNotesCount=()=>getLibrary().filter(x=>x.kind==="note").length;
 const libOutputsCount=()=>getLibrary().filter(x=>x.kind==="output").length;
@@ -1752,7 +1816,7 @@ function openRun(t,existingConv){
       const reply=await callAgentApi(`/v1/agents/${t.id}/run`,{messages,context:bizContext()},pending);
       if(reply){
         messages.push({role:"assistant",content:reply});
-        convId=upsertConversation(convId,t.agent.name,messages,{agentId:t.id,name:t.agent.name});
+        convId=await upsertConversation(convId,t.agent.name,messages,{agentId:t.id,name:t.agent.name});
         renderThread();wireActs();
         const sv=$("#chatSaved");if(sv)sv.style.display="block";
       }
@@ -2049,7 +2113,7 @@ async function refreshSuperFiles(){
     superState.files=data.files||[];
     if(box)box.innerHTML=superState.files.length?`<div class="lcacts" style="flex-wrap:wrap;margin:10px 0">${superState.files.map(f=>`<button class="btn use superfile" style="margin-top:0;flex:none" data-id="${f.id}" data-name="${(f.filename||"file").replace(/"/g,'&quot;')}">⬇️ ${f.filename}</button>`).join("")}</div>`:"";
     if(box)box.querySelectorAll(".superfile").forEach(b=>b.onclick=()=>downloadSuperFile(b.dataset.id,b.dataset.name));
-    if(superState.libId&&superState.messages.length)upsertConversation(superState.libId,superState.messages[0].content.slice(0,40),superState.messages,{superagent:true,sessionId:superState.sessionId,files:superState.files});
+    if(superState.libId&&superState.messages.length)await upsertConversation(superState.libId,superState.messages[0].content.slice(0,40),superState.messages,{superagent:true,sessionId:superState.sessionId,files:superState.files});
   }catch(e){}
 }
 function openSuperFromLibrary(cv){
@@ -2113,7 +2177,7 @@ function renderSuper(){
     if(result.sessionId)superState.sessionId=result.sessionId;
     if(result.ok&&result.text){
       superState.messages.push({role:"assistant",content:result.text});
-      superState.libId=upsertConversation(superState.libId,superState.messages[0].content.slice(0,40),superState.messages,{superagent:true,sessionId:superState.sessionId,files:superState.files});
+      superState.libId=await upsertConversation(superState.libId,superState.messages[0].content.slice(0,40),superState.messages,{superagent:true,sessionId:superState.sessionId,files:superState.files});
       renderThread();
       await refreshSuperFiles();
     }else{
