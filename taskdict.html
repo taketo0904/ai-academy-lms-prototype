@@ -935,6 +935,12 @@ const saveOwned=()=>localStorage.setItem(OKEY,JSON.stringify([...owned]));
 const PLAN_KEY="task-plan-v1",USAGE_KEY="task-usage-v1",FREE_LIMIT=1,STD_LIMIT=80;
 /* プレミアムは表示上「無制限」だが、原価保護のためのフェアユース上限（非表示）。通常利用では到達しない想定。 */
 const PREMIUM_FAIR_USE_LIMIT=1000;
+/* スーパーエージェント（何でも作る）はOpus＋コード実行コンテナを使うため通常エージェントより原価が高い。
+   ワークフローと同様に契約者限定にした上で、さらに独自の月間上限を設ける（実行1回＝1ターン単位でカウント）。 */
+const SUPER_USAGE_KEY="task-super-usage-v1",SUPER_LIMIT_STD=5,SUPER_LIMIT_PREMIUM=30;
+const getSuperUsage=()=>parseInt(localStorage.getItem(SUPER_USAGE_KEY)||"0",10);
+const setSuperUsage=n=>localStorage.setItem(SUPER_USAGE_KEY,String(n));
+const superLimitFor=p=>p==="premium"?SUPER_LIMIT_PREMIUM:(p==="standard"?SUPER_LIMIT_STD:0);
 const getPlan=()=>localStorage.getItem(PLAN_KEY)||"free";
 const limitFor=p=>p==="premium"?PREMIUM_FAIR_USE_LIMIT:(p==="standard"?STD_LIMIT:FREE_LIMIT);
 const setPlan=p=>{localStorage.setItem(PLAN_KEY,p);updatePlanChip();};
@@ -1855,6 +1861,22 @@ function openUpsell(){
   const s=$("#upStd");if(s)s.onclick=()=>{setPlan("standard");$("#mscrim").classList.remove("on");toast("標準プランにしました");renderAll();};
   const pr=$("#upPrem");if(pr)pr.onclick=()=>{setPlan("premium");$("#mscrim").classList.remove("on");toast("プレミアムにアップグレードしました","💎");renderAll();};
 }
+/* スーパーエージェント専用のアップセル。通常エージェントのopenUpsell()とはカウンターが別なので分けている。 */
+function openSuperUpsell(){
+  const plan=getPlan();
+  if(!isSubscriber()){
+    openModal("🔒 スーパーエージェントは契約者限定です","「何でも作る」はOpus＋コード実行を使うため原価が高く、有料プラン（標準・プレミアム）でご利用いただけます。",
+      `<button class="btn get" id="toPlansSuper">プランを見てアップグレード</button>`);
+    const b=$("#toPlansSuper");if(b)b.onclick=()=>{$("#mscrim").classList.remove("on");state.route="plans";renderAll();window.scrollTo(0,0);};
+    return;
+  }
+  const lim=superLimitFor(plan);
+  openModal("⬆️ 今月のスーパーエージェント上限に達しました",`${plan==="premium"?"プレミアム":"標準"}プランの月間上限（${lim}回）に達しました。原価の高い機能のため、通常のエージェント実行回数とは別に管理しています。`,
+    plan==="standard"
+    ?`<button class="btn get" id="upPremSuper">プレミアムにアップグレード（月${SUPER_LIMIT_PREMIUM}回・¥9,800）</button>`
+    :`<p style="font-size:13.5px;color:var(--muted);line-height:1.7">来月の更新をお待ちいただくか、大規模なご利用をご検討の場合は運営までご相談ください。</p>`);
+  const pr=$("#upPremSuper");if(pr)pr.onclick=()=>{setPlan("premium");$("#mscrim").classList.remove("on");toast("プレミアムにアップグレードしました","💎");renderAll();};
+}
 function updatePlanChip(){
   const chip=$("#planChip");if(!chip)return;const plan=getPlan();
   if(plan==="premium"){chip.className="planchip prem";chip.innerHTML="💎 プレミアム ・ 無制限";}
@@ -2132,6 +2154,12 @@ function renderSuper(){
     wrap.appendChild(el("div","empty",`<div class="big">🔌</div>この機能の利用には本番API接続が必要です。<br><span style="font-size:12px">画面右上の設定からAPIのURLを接続してください。</span>`));
     v.appendChild(wrap);return;
   }
+  if(!isSubscriber()){
+    wrap.appendChild(el("div","empty",`<div class="big">🔒</div>スーパーエージェントの利用には有料プラン（標準・プレミアム）が必要です。<br><span style="font-size:12px">Opus＋コード実行を使うため、無料プランでは提供していません。</span><br><button class="btn get" id="toPlansSuperLock" style="margin-top:14px;width:auto;padding:9px 18px">プランを見る</button>`));
+    v.appendChild(wrap);
+    const b=$("#toPlansSuperLock");if(b)b.onclick=()=>{state.route="plans";renderAll();window.scrollTo(0,0);};
+    return;
+  }
   const hasConv=superState.messages.length>0;
   const cases=superCasesSorted();
   const caseGallery=hasConv?"":`
@@ -2164,6 +2192,8 @@ function renderSuper(){
   });
   const send=async()=>{
     const inp=$("#superIn");const text=(inp.value||"").trim();if(!text||superState.running)return;
+    if(getSuperUsage()>=superLimitFor(getPlan())){openSuperUpsell();return;}
+    setSuperUsage(getSuperUsage()+1);
     inp.value="";inp.disabled=true;const btn=$("#superSend");if(btn)btn.disabled=true;
     superState.messages.push({role:"user",content:text});renderThread();
     thread.insertAdjacentHTML("beforeend",`<div class="chatmsg bot" id="superPending">…</div>`);thread.scrollTop=thread.scrollHeight;
